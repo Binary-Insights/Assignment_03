@@ -1,0 +1,6 @@
+# Ignore data and pilots folders
+/data/
+
+# Ignore Python cache
+__pycache__/
+*.pyc
