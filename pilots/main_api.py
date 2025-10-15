@@ -28,10 +28,6 @@ async def chat_endpoint(chat: ChatRequest):
     except Exception as e:
         return {"error": str(e)}
 
-@app.get("/health")
-def health():
-    return {"status": "ok"}
-
 @app.get("/openai-health")
 def openai_health():
     try:
