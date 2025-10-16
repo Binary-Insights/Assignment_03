@@ -8,3 +8,12 @@ streamlit run pilots/chat_app.py --server.port 8501 --server.address 0.0.0.0
 
 FastAPI: http://18.219.43.192:8000/docs
 Streamlit: http://18.219.43.192:8501
+
+
+
+# Step 1
+## Parsing 
+# It creates parsing_provenance.json
+# It reads the downloaded pdf's and parses into text, tables, figures,.. etc using Docling
+python src/parse/docling_extractor.py NVDA --pdf Q4FY25-CFO-Commentary.pdf
+
