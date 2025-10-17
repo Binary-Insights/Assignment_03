@@ -27,6 +27,7 @@ python inspect_page_image.py 2>&1 | grep -v "INFO -"
 
 python src/parse/pdf_reconstructor.py
 
+python src/parse/docling_extractor_v2.py FINTBX/pdf/split_pdfs --pdf fintbx_part_001.pdf
 
 # Works a little better 
- python src/parse/pdf_generator_v2.py "data/parsed/FINTBX/fintbx_part_001/docling_extraction_results.json"
+python src/parse/pdf_generator_v2.py "data/parsed/FINTBX/fintbx_part_001/docling_extraction_results.json"
