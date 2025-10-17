@@ -109,12 +109,25 @@ class DoclingExtractor:
     def _initialize_converter(self):
         """Initialize Docling document converter for v2.49.0."""
         try:
-            # Initialize converter with default settings for v2.49.0
+            from docling.datamodel.base_models import InputFormat
+            from docling.datamodel.pipeline_options import PdfPipelineOptions
+            from docling.document_converter import PdfFormatOption
+            
+            # Initialize converter with pipeline options to enable page image extraction
             # v2.49.0 uses OCR and AI models automatically
-            converter = DocumentConverter()
+            pipeline_options = PdfPipelineOptions()
+            pipeline_options.generate_page_images = True  # Enable page image generation
+            pipeline_options.images_scale = 1.0  # Normal scale
+            
+            converter = DocumentConverter(
+                format_options={
+                    InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
+                }
+            )
             
             self.logger.info("Docling DocumentConverter v2.49.0 initialized successfully")
             self.logger.info("Available models: Table Detection, Formula Detection, Layout Analysis")
+            self.logger.info("Page images generation: ENABLED")
             
             return converter
         
@@ -290,7 +303,7 @@ class DoclingExtractor:
         return analysis
     
     def _extract_content_structure(self, docling_doc, output_dir: Path) -> Dict[str, Any]:
-        """Extract content with proper reading order using Docling v2.49.0."""
+        """Extract content with proper reading order using Docling v2.49.0 iterate_items() API."""
         structure = {
             'reading_order': [],
             'content_blocks': [],
@@ -299,27 +312,44 @@ class DoclingExtractor:
         
         try:
             reading_order_elements = []
-            self.logger.info(f"  Extracting content with reading order...")
+            self.logger.info(f"  Extracting content with reading order using iterate_items()...")
             
-            # Iterate through document items (v2.49.0 API)
-            if hasattr(docling_doc, 'iterate_items'):
-                for item in docling_doc.iterate_items():
-                    element_data = {
-                        'type': getattr(item, 'label', None) or type(item).__name__,
-                        'content': getattr(item, 'text', '') or str(item),
-                        'page': getattr(item, 'page_number', None),
-                        'reading_order': len(reading_order_elements)
-                    }
-                    
-                    reading_order_elements.append(element_data)
-                    
-                    # Save individual text elements
-                    if element_data['content'].strip():
-                        element_file = output_dir / 'reading_order' / f"element_{len(reading_order_elements):04d}.txt"
-                        with open(element_file, 'w', encoding='utf-8') as f:
-                            f.write(f"Type: {element_data['type']}\n")
-                            f.write(f"Page: {element_data['page']}\n")
-                            f.write(f"Content:\n{element_data['content']}")
+            # Use the CORRECT Docling v2.49.0 API: doc.iterate_items()
+            # This properly handles the document hierarchy and content ordering
+            element_counter = 0
+            for element, level in docling_doc.iterate_items():
+                element_type = type(element).__name__
+                
+                # Get text content - works for TextItem, SectionHeaderItem, etc.
+                content = getattr(element, 'text', '') or ""
+                
+                # Get page number from provenance
+                page_num = 0
+                if hasattr(element, 'prov') and element.prov:
+                    page_num = element.prov[0].page_no
+                
+                element_data = {
+                    'type': element_type,
+                    'content': content,
+                    'page': page_num,
+                    'reading_order': element_counter,
+                    'hierarchy_level': level
+                }
+                
+                reading_order_elements.append(element_data)
+                
+                # Save individual text elements (only non-empty)
+                if content.strip():
+                    element_file = output_dir / 'reading_order' / f"page_{page_num:03d}_element_{element_counter:04d}_{element_type}.txt"
+                    element_file.parent.mkdir(parents=True, exist_ok=True)
+                    with open(element_file, 'w', encoding='utf-8') as f:
+                        f.write(f"Type: {element_data['type']}\n")
+                        f.write(f"Page: {element_data['page']}\n")
+                        f.write(f"Hierarchy Level: {element_data['hierarchy_level']}\n")
+                        f.write(f"Content:\n{element_data['content']}")
+                
+                element_counter += 1
+                self.logger.debug(f"      Element {element_counter}: {element_type} on page {page_num}")
             
             structure['reading_order'] = reading_order_elements
             self.stats['reading_order_elements'] = len(reading_order_elements)
@@ -330,6 +360,7 @@ class DoclingExtractor:
             full_text_content = self._extract_structured_text(docling_doc)
             
             text_file = output_dir / 'text' / 'structured_content.txt'
+            text_file.parent.mkdir(parents=True, exist_ok=True)
             with open(text_file, 'w', encoding='utf-8') as f:
                 f.write(full_text_content)
             
@@ -366,16 +397,16 @@ class DoclingExtractor:
         tables_info = {
             'count': 0,
             'tables': [],
-            'extraction_method': 'docling_v2_table_detection'
+            'extraction_method': 'docling_v2_native_blocks'
         }
         
         try:
             tables = []
-            self.logger.info(f"  Starting table extraction...")
+            self.logger.info(f"  Starting table extraction from blocks...")
             
-            # Method 1: Direct table access (v2.49.0)
+            # Direct table access via document.tables (v2.49.0 CORRECT API)
             if hasattr(docling_doc, 'tables') and docling_doc.tables:
-                self.logger.info(f"  Found {len(docling_doc.tables)} table(s) using direct API")
+                self.logger.info(f"  Found {len(docling_doc.tables)} table(s)")
                 
                 for table_idx, table in enumerate(docling_doc.tables):
                     self.logger.debug(f"    Processing table {table_idx + 1}/{len(docling_doc.tables)}")
@@ -385,34 +416,48 @@ class DoclingExtractor:
                         'page': getattr(table, 'page_number', None),
                         'structure': None,
                         'content': None,
-                        'csv_file': None
+                        'csv_file': None,
+                        'html_file': None,
+                        'markdown_content': None
                     }
                     
-                    # Extract table as dataframe
+                    # Extract table as dataframe (THE CORRECT WAY)
                     try:
-                        if hasattr(table, 'to_pandas'):
-                            df = table.to_pandas()
-                        elif hasattr(table, 'to_dataframe'):
-                            df = table.to_dataframe()
+                        # v2.49.0 API: Use export_to_dataframe()
+                        if hasattr(table, 'export_to_dataframe'):
+                            df = table.export_to_dataframe()
+                            
+                            if not df.empty:
+                                table_data['content'] = df.to_dict('records')
+                                table_data['structure'] = {
+                                    'rows': len(df),
+                                    'columns': len(df.columns),
+                                    'headers': list(df.columns)
+                                }
+                                table_data['markdown_content'] = df.to_markdown()
+                                
+                                # Save as CSV
+                                csv_file = output_dir / 'tables' / f"{table_data['table_id']}.csv"
+                                df.to_csv(csv_file, index=False, encoding='utf-8')
+                                table_data['csv_file'] = str(csv_file)
+                                self.logger.debug(f"      Table {table_idx + 1}: {len(df)} rows × {len(df.columns)} columns → CSV")
+                                
+                                # Save as HTML
+                                try:
+                                    if hasattr(table, 'export_to_html'):
+                                        html_content = table.export_to_html(doc=docling_doc)
+                                        html_file = output_dir / 'tables' / f"{table_data['table_id']}.html"
+                                        with open(html_file, 'w', encoding='utf-8') as f:
+                                            f.write(html_content)
+                                        table_data['html_file'] = str(html_file)
+                                        self.logger.debug(f"      Table {table_idx + 1}: Saved as HTML")
+                                except Exception as e:
+                                    self.logger.warning(f"      Failed to save table as HTML: {e}")
                         else:
-                            df = pd.DataFrame()
-                        
-                        if not df.empty:
-                            table_data['content'] = df.to_dict('records')
-                            table_data['structure'] = {
-                                'rows': len(df),
-                                'columns': len(df.columns),
-                                'headers': list(df.columns)
-                            }
-                            
-                            # Save as CSV
-                            csv_file = output_dir / 'tables' / f"{table_data['table_id']}.csv"
-                            df.to_csv(csv_file, index=False, encoding='utf-8')
-                            table_data['csv_file'] = str(csv_file)
-                            
-                            self.logger.debug(f"      Table {table_idx + 1}: {len(df)} rows × {len(df.columns)} columns")
+                            self.logger.warning(f"      Table {table_idx + 1}: export_to_dataframe() not available")
+                    
                     except Exception as e:
-                        self.logger.warning(f"      Failed to convert table to dataframe: {e}")
+                        self.logger.warning(f"      Table {table_idx + 1}: Failed to convert to dataframe: {e}")
                     
                     tables.append(table_data)
                     
@@ -420,34 +465,14 @@ class DoclingExtractor:
                     metadata_file = output_dir / 'tables' / f"{table_data['table_id']}_metadata.json"
                     with open(metadata_file, 'w', encoding='utf-8') as f:
                         json.dump(table_data, f, indent=2, ensure_ascii=False, default=str)
-            
-            # Method 2: Search through document items
-            if not tables:
-                self.logger.debug(f"  No direct tables found, searching document items...")
-                table_idx = 0
-                
-                if hasattr(docling_doc, 'iterate_items'):
-                    for item in docling_doc.iterate_items():
-                        item_type = type(item).__name__
-                        if 'Table' in item_type or 'table' in str(getattr(item, 'label', '')).lower():
-                            self.logger.debug(f"    Found table element: {item_type}")
-                            
-                            table_data = {
-                                'table_id': f"table_{table_idx:03d}",
-                                'page': getattr(item, 'page_number', None),
-                                'type': item_type,
-                                'content': str(item),
-                                'source': 'document_items'
-                            }
-                            
-                            tables.append(table_data)
-                            table_idx += 1
+            else:
+                self.logger.warning(f"  No tables found in document.tables")
             
             tables_info['count'] = len(tables)
             tables_info['tables'] = tables
             self.stats['tables_extracted'] = len(tables)
             
-            self.logger.info(f"  Table extraction completed: {len(tables)} table(s) found")
+            self.logger.info(f"  Table extraction completed: {len(tables)} table(s) found and saved")
             
         except Exception as e:
             self.logger.error(f"Error extracting tables: {e}", exc_info=True)
@@ -456,47 +481,57 @@ class DoclingExtractor:
         return tables_info
     
     def _extract_formulas(self, docling_doc, output_dir: Path) -> Dict[str, Any]:
-        """Extract mathematical formulas and equations."""
+        """Extract mathematical formulas and equations using proper Docling v2.49.0 API."""
         formulas_info = {
             'count': 0,
             'formulas': [],
-            'extraction_method': 'docling_v2_formula_detection'
+            'extraction_method': 'docling_v2_iterate_items_formulas'
         }
         
         try:
             formulas = []
-            self.logger.info(f"  Starting formula extraction...")
+            self.logger.info(f"  Starting formula extraction using iterate_items()...")
             
-            # Search through document items for formulas
+            # Use the CORRECT Docling v2.49.0 API: iterate_items() with TextItem label=FORMULA
+            # Formulas in Docling v2 are TextItem elements with specific labels
+            from docling_core.types.doc import TextItem, DocItemLabel
+            
             formula_idx = 0
-            if hasattr(docling_doc, 'iterate_items'):
-                for item in docling_doc.iterate_items():
-                    item_type = type(item).__name__
-                    item_text = getattr(item, 'text', '')
-                    
-                    # Check if item is a formula
-                    is_formula = ('Formula' in item_type or 'Equation' in item_type or
-                                (item_text and self._contains_math_notation(item_text)))
-                    
-                    if is_formula:
-                        self.logger.debug(f"    Found formula: {item_type} on page {getattr(item, 'page_number', '?')}")
+            for element, level in docling_doc.iterate_items():
+                # Look for TextItem elements with FORMULA label
+                if isinstance(element, TextItem) and hasattr(element, 'label'):
+                    if element.label == DocItemLabel.FORMULA:
+                        self.logger.debug(f"    Found formula TextItem on level {level}")
+                        
+                        # Get page number from provenance
+                        page_num = 0
+                        if hasattr(element, 'prov') and element.prov:
+                            page_num = element.prov[0].page_no
+                        
+                        # Extract formula content - use 'orig' not 'text' (text is empty for formulas)
+                        formula_content = getattr(element, 'orig', '') or getattr(element, 'text', '') or ""
                         
                         formula_data = {
                             'formula_id': f"formula_{formula_idx:03d}",
-                            'type': item_type,
-                            'content': item_text or str(item),
-                            'page': getattr(item, 'page_number', None)
+                            'type': 'TextItem-FORMULA',
+                            'content': formula_content,
+                            'page': page_num,
+                            'hierarchy_level': level
                         }
                         
-                        # Save formula
+                        self.logger.debug(f"      Formula {formula_idx:03d}: Page {page_num}, Content length: {len(formula_content)}")
+                        
+                        # Save formula to file
                         formula_file = output_dir / 'formulas' / f"{formula_data['formula_id']}.txt"
+                        formula_file.parent.mkdir(parents=True, exist_ok=True)
                         with open(formula_file, 'w', encoding='utf-8') as f:
                             f.write(f"Formula ID: {formula_data['formula_id']}\n")
                             f.write(f"Type: {formula_data['type']}\n")
                             f.write(f"Page: {formula_data['page']}\n")
-                            f.write(f"Content: {formula_data['content']}\n")
-                        formula_data['file'] = str(formula_file)
+                            f.write(f"Hierarchy Level: {formula_data['hierarchy_level']}\n")
+                            f.write(f"Content:\n{formula_data['content']}\n")
                         
+                        formula_data['file'] = str(formula_file)
                         formulas.append(formula_data)
                         formula_idx += 1
             
@@ -505,6 +540,9 @@ class DoclingExtractor:
             self.stats['formulas_detected'] = len(formulas)
             
             self.logger.info(f"  Formula extraction completed: {len(formulas)} formula(s) detected")
+            
+            if len(formulas) == 0:
+                self.logger.debug(f"  No formulas found in document (searched all TextItem elements with FORMULA label)")
             
         except Exception as e:
             self.logger.error(f"Error extracting formulas: {e}", exc_info=True)
@@ -525,56 +563,157 @@ class DoclingExtractor:
         return any(indicator in text for indicator in math_indicators)
     
     def _extract_figures(self, docling_doc, output_dir: Path) -> Dict[str, Any]:
-        """Extract figures and images with metadata."""
+        """Extract figures and images with metadata using Docling v2.49.0 correct API with deduplication."""
         figures_info = {
             'count': 0,
             'figures': [],
-            'extraction_method': 'docling_v2_figure_detection'
+            'extraction_method': 'docling_v2_iterate_items_pictures_dedup'
         }
         
         try:
-            figures = []
-            self.logger.info(f"  Starting figure extraction...")
+            import hashlib
+            from PIL import Image as PILImage
             
+            figures = []
+            self.logger.info(f"  Starting figure extraction with deduplication...")
+            
+            # Track image hashes to detect duplicates
+            seen_hashes = {}
             fig_idx = 0
-            if hasattr(docling_doc, 'iterate_items'):
-                for item in docling_doc.iterate_items():
-                    item_type = type(item).__name__
+            duplicate_count = 0
+            
+            # Use the CORRECT Docling v2.49.0 API: doc.pictures or iterate_items() for PictureItem
+            # Direct access to document.pictures is the simplest approach
+            if hasattr(docling_doc, 'pictures'):
+                for picture_item in docling_doc.pictures:
+                    self.logger.debug(f"    Processing PictureItem {fig_idx}: {type(picture_item).__name__}")
                     
-                    # Check for Picture/Figure blocks
-                    if 'Picture' in item_type or 'Figure' in item_type or 'Image' in item_type:
-                        self.logger.debug(f"    Found figure: {item_type} on page {getattr(item, 'page_number', '?')}")
+                    # Get page number from provenance
+                    page_num = 0
+                    bbox = None
+                    if hasattr(picture_item, 'prov') and picture_item.prov:
+                        page_num = picture_item.prov[0].page_no
+                        bbox = picture_item.prov[0].bbox if hasattr(picture_item.prov[0], 'bbox') else None
+                    
+                    # Get caption
+                    caption = ""
+                    if hasattr(picture_item, 'caption_text'):
+                        try:
+                            caption = picture_item.caption_text(docling_doc) or ""
+                        except Exception as e:
+                            self.logger.debug(f"    Could not extract caption: {e}")
+                    
+                    figure_data = {
+                        'figure_id': f"figure_{fig_idx:03d}",
+                        'type': type(picture_item).__name__,
+                        'page': page_num,
+                        'caption': caption,
+                        'image_file': None,
+                        'source': 'document.pictures',
+                        'bbox_coords': str(bbox) if bbox else None
+                    }
+                    
+                    # Try to extract and save image
+                    try:
+                        image = None
                         
-                        figure_data = {
-                            'figure_id': f"figure_{fig_idx:03d}",
-                            'type': item_type,
-                            'page': getattr(item, 'page_number', None),
-                            'caption': getattr(item, 'text', None),
-                            'source': 'document_items'
-                        }
-                        
-                        # Try to extract image
-                        if hasattr(item, 'image'):
+                        # Strategy 1: Try get_image() first (preferred)
+                        if hasattr(picture_item, 'get_image'):
                             try:
-                                image_file = output_dir / 'figures' / f"{figure_data['figure_id']}.png"
-                                with open(image_file, 'wb') as f:
-                                    if isinstance(item.image, bytes):
-                                        f.write(item.image)
-                                    elif hasattr(item.image, 'data'):
-                                        f.write(item.image.data)
-                                figure_data['image_file'] = str(image_file)
-                                self.logger.debug(f"    Saved image for figure {fig_idx}")
+                                image = picture_item.get_image(docling_doc)
+                                self.logger.debug(f"      Got image via get_image()")
                             except Exception as e:
-                                self.logger.warning(f"    Failed to save image: {e}")
+                                self.logger.debug(f"      get_image() failed: {e}")
                         
-                        figures.append(figure_data)
-                        fig_idx += 1
+                        # Strategy 2: Try to crop from page image using bbox
+                        if image is None and hasattr(docling_doc, 'pages') and bbox:
+                            try:
+                                page = docling_doc.pages.get(page_num)
+                                if page and hasattr(page, 'image') and page.image:
+                                    page_img = page.image
+                                    
+                                    # Get PIL image
+                                    if hasattr(page_img, 'pil_image'):
+                                        pil_img = page_img.pil_image
+                                    elif isinstance(page_img, PILImage.Image):
+                                        pil_img = page_img
+                                    else:
+                                        pil_img = None
+                                    
+                                    if pil_img:
+                                        # Crop using bounding box
+                                        # BoundingBox has l, t, r, b (left, top, right, bottom) in document coordinates
+                                        # Need to convert to image pixel coordinates
+                                        page_width = page_img.width if hasattr(page_img, 'width') else pil_img.width
+                                        page_height = page_img.height if hasattr(page_img, 'height') else pil_img.height
+                                        
+                                        # Document bbox to pixel coordinates
+                                        if hasattr(bbox, 'l') and hasattr(bbox, 't'):
+                                            # Assuming page_img dimensions match
+                                            l = max(0, int(bbox.l * page_width / 100))
+                                            t = max(0, int(bbox.t * page_height / 100))
+                                            r = min(pil_img.width, int(bbox.r * page_width / 100))
+                                            b = min(pil_img.height, int(bbox.b * page_height / 100))
+                                            
+                                            if r > l and b > t:
+                                                image = pil_img.crop((l, t, r, b))
+                                                self.logger.debug(f"      Cropped from page: ({l},{t}) to ({r},{b})")
+                                        
+                                        # Fallback: save full page if crop didn't work
+                                        if image is None:
+                                            image = pil_img
+                                            self.logger.debug(f"      Using full page image (bbox conversion failed)")
+                            
+                            except Exception as e:
+                                self.logger.debug(f"      Bbox cropping failed: {e}")
+                        
+                        # If we got an image, check for duplicates and save
+                        if image:
+                            # Compute hash to detect duplicates
+                            from io import BytesIO
+                            img_bytes = BytesIO()
+                            image.save(img_bytes, format='PNG')
+                            img_hash = hashlib.md5(img_bytes.getvalue()).hexdigest()
+                            
+                            # Check if we've seen this exact image before
+                            if img_hash in seen_hashes:
+                                # Duplicate detected
+                                original_fig = seen_hashes[img_hash]
+                                self.logger.debug(f"      Duplicate detected! Same as {original_fig['figure_id']}")
+                                duplicate_count += 1
+                                # Skip saving, but track it
+                                figure_data['image_file'] = original_fig['image_file']
+                                figure_data['is_duplicate_of'] = original_fig['figure_id']
+                            else:
+                                # New unique image - save it
+                                image_file = output_dir / 'figures' / f"{figure_data['figure_id']}.png"
+                                image_file.parent.mkdir(parents=True, exist_ok=True)
+                                image.save(str(image_file))
+                                
+                                figure_data['image_file'] = str(image_file)
+                                seen_hashes[img_hash] = figure_data
+                                self.logger.debug(f"      Saved unique image: {image_file.name}")
+                        else:
+                            self.logger.debug(f"      Picture {fig_idx} on page {page_num}: could not extract image")
+                    
+                    except Exception as e:
+                        self.logger.debug(f"      Error extracting image for figure {fig_idx}: {e}")
+                    
+                    figures.append(figure_data)
+                    fig_idx += 1
             
             figures_info['count'] = len(figures)
             figures_info['figures'] = figures
+            figures_info['unique_count'] = len(seen_hashes)
+            figures_info['duplicates_found'] = duplicate_count
             self.stats['figures_detected'] = len(figures)
             
             self.logger.info(f"  Figure extraction completed: {len(figures)} figure(s) detected")
+            self.logger.info(f"    - Unique images: {len(seen_hashes)}")
+            self.logger.info(f"    - Duplicates: {duplicate_count}")
+            
+            if len(figures) == 0:
+                self.logger.warning(f"  No pictures found in document (document.pictures is empty)")
             
         except Exception as e:
             self.logger.error(f"Error extracting figures: {e}", exc_info=True)

@@ -11,8 +11,9 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "streamlit>=1.39.0",
     "requests>=2.32.0",
-    "docling==1.20.0",
+    "docling",
     "dvc[s3]>=3.63.0",
     "awscli>=1.42.18",
     "pypdf2>=3.0.1",
+    "onnxruntime-gpu>=1.23.0",
 ]
