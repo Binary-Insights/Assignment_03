@@ -17,3 +17,16 @@ Streamlit: http://18.219.43.192:8501
 # It reads the downloaded pdf's and parses into text, tables, figures,.. etc using Docling
 python src/parse/docling_extractor.py NVDA --pdf Q4FY25-CFO-Commentary.pdf
 
+python diagnose_structure.py
+
+python inspect_doc.py 2>&1 | sed -n '1,200p'
+
+python test_extraction.py 2>&1 | tail -60
+
+python inspect_page_image.py 2>&1 | grep -v "INFO -"
+
+python src/parse/pdf_reconstructor.py
+
+
+# Works a little better 
+ python src/parse/pdf_generator_v2.py "data/parsed/FINTBX/fintbx_part_001/docling_extraction_results.json"
