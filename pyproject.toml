@@ -14,4 +14,5 @@ dependencies = [
     "docling==1.20.0",
     "dvc[s3]>=3.63.0",
     "awscli>=1.42.18",
+    "pypdf2>=3.0.1",
 ]
