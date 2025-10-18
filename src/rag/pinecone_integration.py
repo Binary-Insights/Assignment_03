@@ -8,6 +8,11 @@ from dataclasses import dataclass
 import json
 import hashlib
 from datetime import datetime
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 @dataclass
@@ -164,16 +169,59 @@ class PineconeQueryBuilder:
 class PineconeRAGIntegration:
     """High-level interface for RAG operations with Pinecone"""
     
-    def __init__(self, index_name: str = "fintbx-rag", namespace: str = "production"):
+    def __init__(self, index_name: str = None, namespace: str = "production"):
+        """
+        Initialize Pinecone RAG Integration
+        
+        Args:
+            index_name: Pinecone index name (reads from .env if not provided)
+            namespace: Namespace for the index
+        """
+        # Read from .env file if not provided
+        if index_name is None:
+            index_name = os.getenv("PINECONE_INDEX_NAME", "bigdata-assignment-03")
+        
         self.index_name = index_name
         self.namespace = namespace
+        self.api_key = os.getenv("PINECONE_API_KEY")
+        
+        # Read embedding configuration from .env
+        self.embedding_model = os.getenv("PINECONE_EMBEDDING_MODEL", "text-embedding-3-large")
+        self.embedding_dimension = int(os.getenv("PINECONE_EMBEDDING_DIMENSION", "3072"))
+        
+        # Log configuration (without exposing full API key)
+        print(f"Pinecone Configuration:")
+        print(f"  Index Name: {self.index_name}")
+        print(f"  Namespace: {self.namespace}")
+        print(f"  Embedding Model: {self.embedding_model}")
+        print(f"  Embedding Dimension: {self.embedding_dimension}")
+        print(f"  API Key Status: {'✓ Loaded' if self.api_key else '⚠ Not found'}")
         
         # Note: In production, initialize actual Pinecone client here
-        # from pinecone import Pinecone
-        # self.pc = Pinecone(api_key=os.environ.get("PINECONE_API_KEY"))
-        # self.index = self.pc.Index(index_name)
+        if self.api_key:
+            # from pinecone import Pinecone
+            # self.pc = Pinecone(api_key=self.api_key)
+            # self.index = self.pc.Index(self.index_name)
+            pass
         
         self.chunks_storage = {}  # For demo purposes
+    
+    def validate_embedding_dimension(self, embedding: List[float]) -> bool:
+        """
+        Validate that incoming embedding matches configured dimension
+        
+        Args:
+            embedding: Embedding vector to validate
+            
+        Returns:
+            True if valid, False otherwise
+        """
+        if len(embedding) != self.embedding_dimension:
+            print(f"⚠ Embedding dimension mismatch!")
+            print(f"  Expected: {self.embedding_dimension} ({self.embedding_model})")
+            print(f"  Got: {len(embedding)}")
+            return False
+        return True
     
     def prepare_chunks_for_storage(
         self,

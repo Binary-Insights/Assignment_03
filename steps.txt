@@ -11,6 +11,8 @@ Streamlit: http://18.219.43.192:8501
 
 
 
+----------------------------------------------- LAB - 01 -------------------------------------
+
 # Step 1
 ## Parsing 
 # It creates parsing_provenance.json
@@ -31,3 +33,19 @@ python src/parse/docling_extractor_v2.py FINTBX/pdf/split_pdfs --pdf fintbx_part
 
 # Works a little better 
 python src/parse/pdf_generator_v2.py "data/parsed/FINTBX/fintbx_part_001/docling_extraction_results.json"
+
+
+#
+
+
+# Does chunking part of Lab 1 
+
+# Gives a summary of pinecone integration
+python src/rag/pinecone_integration.py
+
+
+# Ingestion into Pinecone - inserts vectors into 
+python src/rag/ingest_to_pinecone.py
+
+
+----------------------------------------------- LAB - 02 -------------------------------------

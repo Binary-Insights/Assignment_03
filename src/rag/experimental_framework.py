@@ -10,7 +10,7 @@ from typing import Dict, List, Any, Tuple
 from dataclasses import dataclass, asdict
 import statistics
 
-from langchain.text_splitter import (
+from langchain_text_splitters import (
     RecursiveCharacterTextSplitter,
     MarkdownHeaderTextSplitter,
     Language
@@ -75,6 +75,28 @@ class StrategyMetrics:
         return asdict(self)
 
 
+def extract_text_from_chunk(chunk):
+    """Helper to extract text from either Document objects or dicts"""
+    if hasattr(chunk, 'page_content'):
+        # It's a LangChain Document object
+        return chunk.page_content
+    elif isinstance(chunk, dict):
+        return chunk.get("text", "")
+    else:
+        return str(chunk)
+
+
+def extract_metadata_from_chunk(chunk):
+    """Helper to extract metadata from either Document objects or dicts"""
+    if hasattr(chunk, 'metadata'):
+        # It's a LangChain Document object
+        return chunk.metadata if isinstance(chunk.metadata, dict) else {}
+    elif isinstance(chunk, dict):
+        return chunk
+    else:
+        return {}
+
+
 class ChunkingStrategy:
     """Base class for chunking strategies"""
     
@@ -121,11 +143,14 @@ class MarkdownHeaderStrategy(ChunkingStrategy):
         # Convert to standard format
         result = []
         for i, chunk in enumerate(chunks):
+            chunk_text = extract_text_from_chunk(chunk)
+            metadata = extract_metadata_from_chunk(chunk)
+            
             result.append({
-                "text": chunk.get("text", ""),
-                "h1": chunk.get("h1"),
-                "h2": chunk.get("h2"),
-                "h3": chunk.get("h3"),
+                "text": chunk_text,
+                "h1": metadata.get("h1"),
+                "h2": metadata.get("h2"),
+                "h3": metadata.get("h3"),
                 "chunk_id": f"chunk_{i:06d}",
                 "chunk_strategy": self.name,
             })
@@ -195,15 +220,16 @@ class HybridStrategy(ChunkingStrategy):
         chunk_id = 0
         
         for header_chunk in header_chunks:
-            chunk_text = header_chunk.get("text", "")
+            chunk_text = extract_text_from_chunk(header_chunk)
+            metadata = extract_metadata_from_chunk(header_chunk)
             
             # Step 2: If chunk is small enough, keep it
             if len(chunk_text) <= self.max_section_size:
                 result.append({
                     "text": chunk_text,
-                    "h1": header_chunk.get("h1"),
-                    "h2": header_chunk.get("h2"),
-                    "h3": header_chunk.get("h3"),
+                    "h1": metadata.get("h1"),
+                    "h2": metadata.get("h2"),
+                    "h3": metadata.get("h3"),
                     "chunk_id": f"chunk_{chunk_id:06d}",
                     "chunk_strategy": self.name,
                     "is_sub_split": False,
@@ -214,11 +240,13 @@ class HybridStrategy(ChunkingStrategy):
                 sub_chunks = self.recursive_splitter.split_text(chunk_text)
                 
                 for sub_chunk in sub_chunks:
+                    sub_text = extract_text_from_chunk(sub_chunk)
+                    
                     result.append({
-                        "text": sub_chunk,
-                        "h1": header_chunk.get("h1"),
-                        "h2": header_chunk.get("h2"),
-                        "h3": header_chunk.get("h3"),
+                        "text": sub_text,
+                        "h1": metadata.get("h1"),
+                        "h2": metadata.get("h2"),
+                        "h3": metadata.get("h3"),
                         "chunk_id": f"chunk_{chunk_id:06d}",
                         "chunk_strategy": self.name,
                         "is_sub_split": True,
@@ -229,12 +257,12 @@ class HybridStrategy(ChunkingStrategy):
 
 
 class CodeAwareStrategy(ChunkingStrategy):
-    """Split while respecting MATLAB code blocks"""
+    """Split while respecting code blocks"""
     
     def __init__(self):
         super().__init__("CodeAware")
         self.splitter = RecursiveCharacterTextSplitter.from_language(
-            language=Language.MATLAB,
+            language=Language.PYTHON,
             chunk_size=900,
             chunk_overlap=200,
         )
@@ -524,8 +552,8 @@ class ExperimentalFramework:
 def main():
     """Main experimental run"""
     
-    # Paths
-    project_root = Path(__file__).parent
+    # Paths - go up from src/rag to project root
+    project_root = Path(__file__).parent.parent.parent  # Go up 3 levels: rag -> src -> project_root
     doc_path = project_root / "data/parsed/FINTBX/fintbx_part_001/text/structured_content.txt"
     output_dir = project_root / "data/rag_experiments"
     
