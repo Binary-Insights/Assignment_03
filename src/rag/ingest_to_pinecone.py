@@ -185,8 +185,14 @@ def main():
     # Determine project root
     project_root = Path(__file__).parent.parent.parent
     
-    # Use best strategy (hybrid)
-    chunk_file = project_root / "data/rag_experiments/chunks_hybrid.json"
+    # Use CodeAware strategy (optimal for MATLAB Financial Toolbox guide)
+    # This strategy respects code block boundaries and is best for programming guides
+    chunk_file = project_root / "data/rag_experiments/chunks_codeaware.json"
+    
+    # Alternative strategies:
+    # chunk_file = project_root / "data/rag_experiments/chunks_hybrid.json"        # Good for structure-aware docs
+    # chunk_file = project_root / "data/rag_experiments/chunks_markdownheader.json" # Good for narrative docs
+    # chunk_file = project_root / "data/rag_experiments/chunks_recursive.json"      # Generic splitting
     
     print("="*70)
     print("PINECONE INGESTION - Upload Chunks with Embeddings")
