@@ -30,3 +30,16 @@ python src/parse/pdf_reconstructor.py
 
 # Works a little better 
  python src/parse/pdf_generator_v2.py "data/parsed/FINTBX/fintbx_part_001/docling_extraction_results.json"
+
+To run docling_extractor_v2.py
+Note: If ping/curl fail, you can try temporarily switching resolver to Google DNS (careful — this overwrites resolv.conf):
+sudo bash -c 'echo "nameserver 8.8.8.8" > /etc/resolv.conf'
+
+-->Fix DNS / enable network (if you want downloads to work)
+
+Verify DNS name resolution and internet access from the WSL session:
+ ping -c 3 www.modelscope.cn 
+ curl -I https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.4.0/resources/fonts/FZYTK.TTF
+
+Re-run extraction:
+ python src/parse/docling_extractor_v2.py FINTBX/pdf/split_pdfs --pdf fintbx_part_001.pdf
