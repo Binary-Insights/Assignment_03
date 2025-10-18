@@ -60,6 +60,9 @@ class PDFGeneratorV2:
         self.figure_map = {}  # Maps (page, sequence) to figure file
         self.embedded_figures = set()  # Track which figures we've embedded
         self.figure_by_id = {}  # Maps figure_id to metadata
+        
+        # NEW: Table tracking for content lookup
+        self.tables_list = []  # Will be populated from extraction_data
     
     def _setup_logging(self):
         """Setup logging for generator."""
@@ -137,11 +140,16 @@ class PDFGeneratorV2:
             content_structure = extraction_data.get('content_structure', {})
             reading_order = content_structure.get('reading_order', [])
             figures_meta = content_structure.get('figures', {})
+            tables_meta = content_structure.get('tables', {})  # NEW: Load tables metadata
             
             # Build figure master index
             self._build_figure_map(figures_meta, reading_order)
             self.logger.info(f"Built figure map with {len(self.figure_by_id)} figures")
             self.logger.info(f"Figure deduplication info: unique={figures_meta.get('unique_count', '?')}, duplicates={figures_meta.get('duplicates_found', '?')}")
+            
+            # NEW: Build table master index for correlation
+            self.tables_list = tables_meta.get('tables', [])  # Access to extracted tables
+            self.logger.info(f"Loaded {len(self.tables_list)} extracted tables for content lookup")
             
             # Organize elements by page
             elements_by_page = self._organize_elements_by_page(reading_order)
@@ -196,19 +204,28 @@ class PDFGeneratorV2:
                             fig_path = self._get_figure_for_element(elem, reading_order.index(elem))
                             if fig_path and Path(fig_path).exists():
                                 try:
-                                    img = self._create_image(Path(fig_path))
+                                    # ENHANCEMENT: Get aspect ratio from element metadata
+                                    aspect_ratio = None
+                                    if 'image_dimensions' in elem and elem['image_dimensions']:
+                                        aspect_ratio = elem['image_dimensions'].get('aspect_ratio')
+                                    
+                                    # Create image with aspect ratio preservation
+                                    img = self._create_image(Path(fig_path), aspect_ratio=aspect_ratio)
                                     if img:
                                         story.append(img)
                                         story.append(Spacer(1, 0.2*inch))
                                         generation_report['figures_embedded'] += 1
                                         page_content_added = True
                                         
-                                        # Log figure mapping
-                                        generation_report['figure_mapping_details'].append({
+                                        # Log figure mapping with resolution info
+                                        mapping_detail = {
                                             'page': page_num,
                                             'figure_file': str(fig_path),
                                             'element_index': reading_order.index(elem)
-                                        })
+                                        }
+                                        if aspect_ratio:
+                                            mapping_detail['aspect_ratio'] = aspect_ratio
+                                        generation_report['figure_mapping_details'].append(mapping_detail)
                                 except Exception as e:
                                     self.logger.warning(f"Failed to embed figure on page {page_num}: {e}")
                                     generation_report['warnings'].append(f"Failed to embed figure: {e}")
@@ -443,8 +460,7 @@ class PDFGeneratorV2:
             else:
                 style_name = 'Normal'
             
-            para = Paragraph(content, styles[style_name])
-            return para
+            return Paragraph(content, styles[style_name])
             
         except Exception as e:
             self.logger.warning(f"Error creating paragraph: {e}")
@@ -466,10 +482,50 @@ class PDFGeneratorV2:
         return text
     
     def _extract_table_content(self, table_elem: Dict) -> Optional[List[List[str]]]:
-        """Extract table content from TableItem."""
+        """Extract table content from TableItem using new table mapping."""
         try:
+            # NEW: First check if table has table_index mapping from extraction
+            table_index = table_elem.get('table_index')
+            page = table_elem.get('page')
+            
+            # Debug logging
+            if table_index is not None:
+                self.logger.info(f"DEBUG: TableItem found with table_index={table_index}, page={page}")
+                self.logger.info(f"DEBUG: hasattr(self, 'tables_list')={hasattr(self, 'tables_list')}, self.tables_list length={len(self.tables_list) if hasattr(self, 'tables_list') else 'N/A'}")
+            
+            if table_index is not None and hasattr(self, 'tables_list') and self.tables_list:
+                # Look up table content from extracted tables
+                if 0 <= table_index < len(self.tables_list):
+                    table_data_raw = self.tables_list[table_index].get('content', [])
+                    self.logger.info(f"DEBUG: Looking up table[{table_index}], raw rows={len(table_data_raw)}")
+                    
+                    # Convert from dict format to list format
+                    if isinstance(table_data_raw, list) and len(table_data_raw) > 0:
+                        table_data = []
+                        for row_idx, row in enumerate(table_data_raw):
+                            if isinstance(row, dict):
+                                # Convert dict row to list, preserving column order
+                                cells = [str(row.get(key, '')) for key in sorted(row.keys())]
+                                table_data.append(cells)
+                            elif isinstance(row, list):
+                                table_data.append([str(cell) for cell in row])
+                        
+                        if table_data:
+                            self.logger.info(f"SUCCESS: Table lookup successful: table_index={table_index}, converted_rows={len(table_data)}")
+                            return table_data
+                        else:
+                            self.logger.warning(f"FAIL: table_data is empty after conversion")
+                    else:
+                        self.logger.warning(f"FAIL: table_data_raw is not a list or is empty. type={type(table_data_raw)}, len={len(table_data_raw) if isinstance(table_data_raw, list) else 'N/A'}")
+                else:
+                    self.logger.warning(f"FAIL: Table index out of range: {table_index} (max: {len(self.tables_list)-1})")
+            else:
+                self.logger.info(f"DEBUG: table_index check failed. table_index={table_index}, has_tables_list={hasattr(self, 'tables_list')}, tables_list_empty={not bool(self.tables_list) if hasattr(self, 'tables_list') else 'N/A'}")
+            
+            # FALLBACK: Try to parse CSV content from table_elem (legacy approach)
             content = table_elem.get('content', '')
             if not content:
+                self.logger.debug(f"No content in table_elem, returning None")
                 return None
             
             # Try to parse CSV content
@@ -484,7 +540,7 @@ class PDFGeneratorV2:
             return None
             
         except Exception as e:
-            self.logger.warning(f"Error extracting table: {e}")
+            self.logger.error(f"ERROR in _extract_table_content: {e}", exc_info=True)
             return None
     
     def _create_table(self, table_data: List[List[str]], styles):
@@ -520,14 +576,42 @@ class PDFGeneratorV2:
             self.logger.warning(f"Error creating table: {e}")
             return None
     
-    def _create_image(self, image_path: Path, max_width: float = 6.5, max_height: float = 4.5):
-        """Create scaled image for PDF."""
+    def _create_image(self, image_path: Path, max_width: float = 6.0, max_height: float = 4.0, aspect_ratio: float = None):
+        """
+        Create scaled image for PDF while maintaining aspect ratio.
+        
+        Args:
+            image_path: Path to image file
+            max_width: Maximum width in inches (default 6.0")
+            max_height: Maximum height in inches (default 4.0")
+            aspect_ratio: Original aspect ratio (width/height) to maintain scaling
+            
+        Returns:
+            Scaled Image object or None
+        """
         try:
             if not image_path.exists():
                 self.logger.warning(f"Image not found: {image_path}")
                 return None
             
-            img = Image(str(image_path), width=max_width*inch, height=max_height*inch)
+            # If aspect ratio provided, use it to calculate one dimension
+            if aspect_ratio and aspect_ratio > 0:
+                # Scale by width first
+                scaled_width = max_width
+                scaled_height = scaled_width / aspect_ratio
+                
+                # If height exceeds max, scale by height instead
+                if scaled_height > max_height:
+                    scaled_height = max_height
+                    scaled_width = scaled_height * aspect_ratio
+                
+                img = Image(str(image_path), width=scaled_width*inch, height=scaled_height*inch)
+                self.logger.debug(f"Created image with aspect ratio preserved: {scaled_width:.2f}\" x {scaled_height:.2f}\" (ratio: {aspect_ratio:.2f})")
+            else:
+                # Fallback: use fixed dimensions if no aspect ratio provided
+                img = Image(str(image_path), width=max_width*inch, height=max_height*inch)
+                self.logger.debug(f"Created image with fixed dimensions: {max_width}\" x {max_height}\"")
+            
             return img
             
         except Exception as e:

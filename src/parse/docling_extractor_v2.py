@@ -317,6 +317,8 @@ class DoclingExtractor:
             # Use the CORRECT Docling v2.49.0 API: doc.iterate_items()
             # This properly handles the document hierarchy and content ordering
             element_counter = 0
+            table_counter = 0  # Track table sequence for mapping to extracted tables
+            
             for element, level in docling_doc.iterate_items():
                 element_type = type(element).__name__
                 
@@ -336,6 +338,13 @@ class DoclingExtractor:
                     'hierarchy_level': level
                 }
                 
+                # ENHANCEMENT: For TableItems, add table mapping metadata
+                # This allows PDF generation to look up table content from content_structure.tables
+                if element_type == 'TableItem':
+                    element_data['table_index'] = table_counter  # Maps to tables_list[table_counter]
+                    element_data['table_mapping_note'] = f"Maps to content_structure.tables[{table_counter}]"
+                    table_counter += 1
+                
                 reading_order_elements.append(element_data)
                 
                 # Save individual text elements (only non-empty)
@@ -346,14 +355,18 @@ class DoclingExtractor:
                         f.write(f"Type: {element_data['type']}\n")
                         f.write(f"Page: {element_data['page']}\n")
                         f.write(f"Hierarchy Level: {element_data['hierarchy_level']}\n")
+                        if element_type == 'TableItem':
+                            f.write(f"Table Index: {element_data.get('table_index')}\n")
                         f.write(f"Content:\n{element_data['content']}")
                 
                 element_counter += 1
-                self.logger.debug(f"      Element {element_counter}: {element_type} on page {page_num}")
+                self.logger.debug(f"      Element {element_counter}: {element_type} on page {page_num}" + 
+                                 (f" [Table #{table_counter-1}]" if element_type == 'TableItem' else ""))
             
             structure['reading_order'] = reading_order_elements
             self.stats['reading_order_elements'] = len(reading_order_elements)
             self.logger.info(f"  Content structure extracted: {len(reading_order_elements)} elements in reading order")
+            self.logger.info(f"  Table mapping created: {table_counter} TableItems mapped to extracted tables")
             
             # Extract full text
             self.logger.info(f"  Extracting full text content...")
@@ -610,7 +623,9 @@ class DoclingExtractor:
                         'caption': caption,
                         'image_file': None,
                         'source': 'document.pictures',
-                        'bbox_coords': str(bbox) if bbox else None
+                        'bbox_coords': str(bbox) if bbox else None,
+                        'image_dimensions': None,  # ENHANCEMENT: Track original image dimensions
+                        'bbox_percentages': None    # ENHANCEMENT: Store bbox as percentages for PDF sizing
                     }
                     
                     # Try to extract and save image
@@ -669,6 +684,31 @@ class DoclingExtractor:
                         
                         # If we got an image, check for duplicates and save
                         if image:
+                            # ENHANCEMENT: Store original image dimensions before saving
+                            img_width, img_height = image.size
+                            aspect_ratio = img_width / img_height if img_height > 0 else 1.0
+                            
+                            figure_data['image_dimensions'] = {
+                                'width': img_width,
+                                'height': img_height,
+                                'aspect_ratio': aspect_ratio
+                            }
+                            
+                            # ENHANCEMENT: Store bbox as percentages for sizing in PDF
+                            if bbox:
+                                try:
+                                    figure_data['bbox_percentages'] = {
+                                        'left': float(bbox.l),
+                                        'top': float(bbox.t),
+                                        'right': float(bbox.r),
+                                        'bottom': float(bbox.b),
+                                        'width': float(bbox.r - bbox.l),
+                                        'height': float(bbox.b - bbox.t)
+                                    }
+                                    self.logger.debug(f"      Image dimensions: {img_width}x{img_height}px, aspect ratio: {aspect_ratio:.2f}")
+                                except Exception as e:
+                                    self.logger.debug(f"      Could not extract bbox percentages: {e}")
+                            
                             # Compute hash to detect duplicates
                             from io import BytesIO
                             img_bytes = BytesIO()
@@ -692,7 +732,7 @@ class DoclingExtractor:
                                 
                                 figure_data['image_file'] = str(image_file)
                                 seen_hashes[img_hash] = figure_data
-                                self.logger.debug(f"      Saved unique image: {image_file.name}")
+                                self.logger.debug(f"      Saved unique image: {image_file.name} ({img_width}x{img_height}px)")
                         else:
                             self.logger.debug(f"      Picture {fig_idx} on page {page_num}: could not extract image")
                     

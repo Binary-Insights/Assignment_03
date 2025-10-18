@@ -11,6 +11,8 @@ Streamlit: http://18.219.43.192:8501
 
 
 
+----------------------------------------------- LAB - 01 -------------------------------------
+
 # Step 1
 ## Parsing 
 # It creates parsing_provenance.json
@@ -27,9 +29,63 @@ python inspect_page_image.py 2>&1 | grep -v "INFO -"
 
 python src/parse/pdf_reconstructor.py
 
+python src/parse/docling_extractor_v2.py FINTBX/pdf/split_pdfs --pdf fintbx_part_001.pdf
 
 # Works a little better 
- python src/parse/pdf_generator_v2.py "data/parsed/FINTBX/fintbx_part_001/docling_extraction_results.json"
+python src/parse/pdf_generator_v2.py "data/parsed/FINTBX/fintbx_part_001/docling_extraction_results.json"
+
+
+#
+
+
+# Does chunking part of Lab 1 
+
+# Gives a summary of pinecone integration
+python src/rag/pinecone_integration.py
+
+
+# Ingestion into Pinecone - inserts vectors into 
+python src/rag/ingest_to_pinecone.py
+
+
+----------------------------------------------- LAB - 02 -------------------------------------
+
+(.venv_secondary) enigmasentry@enigmasentry:/mnt/c/Users/enigm/OneDrive/Documents/NortheasternAssignments/09_BigDataIntelAnlytics/Assignments/Assignment_03$ python pilots/rag_lc.py
+Traceback (most recent call last):
+  File "/mnt/c/Users/enigm/OneDrive/Documents/NortheasternAssignments/09_BigDataIntelAnlytics/Assignments/Assignment_03/pilots/rag_lc.py", line 6, in <module>
+    from langchain_pinecone import PineconeVectorStore
+ModuleNotFoundError: No module named 'langchain_pinecone'
+(.venv_secondary) enigmasentry@enigmasentry:/mnt/c/Users/enigm/OneDrive/Documents/NortheasternAssignments/09_BigDataIntelAnlytics/Assignments/Assignment_03$ uv pip install langchain_pinecone
+Using Python 3.11.13 environment at: .venv_secondary
+Resolved 49 packages in 1.09s
+Prepared 4 packages in 3.92s
+Uninstalled 2 packages in 1.00s                                                                                         
+░░░░░░░░░░░░░░░░░░░░ [0/14] Installing wheels...                                                                        warning: Failed to hardlink files; falling back to full copy. This may lead to degraded performance.                    
+         If the cache and target directories are on different filesystems, hardlinking may not be supported.            
+         If this is intentional, set `export UV_LINK_MODE=copy` or use `--link-mode=copy` to suppress this warning.     
+Installed 14 packages in 6.53s
+ + aiohappyeyeballs==2.6.1
+ + aiohttp==3.13.1
+ + aiohttp-retry==2.9.1
+ + aiosignal==1.4.0
+ + attrs==25.4.0
+ + frozenlist==1.8.0
+ - langchain-core==1.0.0
+ + langchain-core==0.3.79
+ - langchain-openai==1.0.0
+ + langchain-openai==0.3.35
+ + langchain-pinecone==0.2.12
+ + multidict==6.7.0
+ + numpy==2.3.4
+ + propcache==0.4.1
+ + simsimd==6.5.3
+ + yarl==1.22.0
+
+
+
+
+
+ streamlit run pilots/rag_streamlit_app.py
 
 To run docling_extractor_v2.py
 Note: If ping/curl fail, you can try temporarily switching resolver to Google DNS (careful — this overwrites resolv.conf):
