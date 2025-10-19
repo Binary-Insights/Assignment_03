@@ -48,6 +48,11 @@ python src/rag/pinecone_integration.py
 python src/rag/ingest_to_pinecone.py
 
 
+
+# This is one way to run the FastAPI server 
+python -m uvicorn backends.rag_fastapi_server:app --reload --host localhost --port 8000
+
+
 ----------------------------------------------- LAB - 02 -------------------------------------
 
 (.venv_secondary) enigmasentry@enigmasentry:/mnt/c/Users/enigm/OneDrive/Documents/NortheasternAssignments/09_BigDataIntelAnlytics/Assignments/Assignment_03$ python pilots/rag_lc.py
