@@ -99,3 +99,13 @@ Verify DNS name resolution and internet access from the WSL session:
 
 Re-run extraction:
  python src/parse/docling_extractor_v2.py FINTBX/pdf/split_pdfs --pdf fintbx_part_001.pdf
+
+
+---> If you later modify dependencies or your Dockerfile, rebuild the image manually:
+
+docker build -t assignment03:latest -f Dockerfile .
+
+
+---> Then bring up your stack again without rebuilding:
+
+docker compose up -d --no-build

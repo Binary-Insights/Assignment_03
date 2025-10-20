@@ -1,0 +1,27 @@
+﻿@'
+# --- Python/venv ---
+.venv/
+.venv_secondary/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# --- VCS & tooling ---
+.git/
+.gitignore
+.dvc/
+*.log
+
+# --- Local artifacts / big files (mount at runtime instead) ---
+data/
+logs/
+models/
+checkpoints/
+.artifacts/
+.cache/
+
+# --- OS cruft ---
+Thumbs.db
+.DS_Store
+'@ | Out-File -Encoding utf8 -NoNewline .dockerignore

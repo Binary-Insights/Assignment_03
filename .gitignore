@@ -1,6 +1,9 @@
 /data
 airflow
 models
+config
+logs
+plugins
 
 *.md
 .venv*
