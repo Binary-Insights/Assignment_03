@@ -44,11 +44,11 @@ RUN cd /tmp && \
     psutil
 
 # Pre-download the deepsearch_glm model to avoid runtime download issues
-RUN echo "try:" > /tmp/preload.py && \
-    echo "    from docling.document_converter import DocumentConverter" >> /tmp/preload.py && \
-    echo "    converter = DocumentConverter()" >> /tmp/preload.py && \
-    echo "    print('Models pre-downloaded successfully')" >> /tmp/preload.py && \
-    echo "except Exception as e:" >> /tmp/preload.py && \
-    echo "    print('Model pre-download failed:', str(e))" >> /tmp/preload.py && \
-    python /tmp/preload.py && \
-    rm /tmp/preload.py
+# RUN echo "try:" > /tmp/preload.py && \
+#     echo "    from docling.document_converter import DocumentConverter" >> /tmp/preload.py && \
+#     echo "    converter = DocumentConverter()" >> /tmp/preload.py && \
+#     echo "    print('Models pre-downloaded successfully')" >> /tmp/preload.py && \
+#     echo "except Exception as e:" >> /tmp/preload.py && \
+#     echo "    print('Model pre-download failed:', str(e))" >> /tmp/preload.py && \
+#     python /tmp/preload.py && \
+#     rm /tmp/preload.py

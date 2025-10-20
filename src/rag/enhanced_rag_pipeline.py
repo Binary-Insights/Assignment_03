@@ -57,15 +57,21 @@ class EnhancedRAGPipeline:
         self.pinecone_index = pc.Index(index_name)
         
         # Initialize database
-        self.db = ConceptDatabase(
-            host=os.getenv("DB_HOST", "localhost"),
-            port=int(os.getenv("DB_PORT", 5432)),
-            database=os.getenv("DB_NAME", "concept_db"),
-            user=os.getenv("DB_USER", "postgres"),
-            password=os.getenv("DB_PASSWORD", "postgres")
-        )
-        self.db.connect()
-        self.db.initialize_schema()
+        try:
+            self.db = ConceptDatabase(
+                host=os.getenv("DB_HOST", "localhost"),
+                port=int(os.getenv("DB_PORT", 5432)),
+                database=os.getenv("DB_NAME", "concept_db"),
+                user=os.getenv("DB_USER", "postgres"),
+                password=os.getenv("DB_PASSWORD", "postgres")
+            )
+            self.db.connect()
+            self.db.initialize_schema()
+            logger.info("✓ Database connected successfully")
+        except Exception as e:
+            logger.warning(f"⚠️ Database connection failed: {e}")
+            logger.warning("⚠️ Running in limited mode without caching. Cache features will be disabled.")
+            self.db = None
         
         # Get Wikipedia tools
         self.wikipedia_tools = get_tools()
@@ -105,6 +111,9 @@ class EnhancedRAGPipeline:
     
     def check_database_cache(self, concept_term: str) -> Optional[Dict[str, Any]]:
         """Check if concept exists in PostgreSQL cache"""
+        if not self.db:
+            return None
+        
         try:
             cached = self.db.get_concept(concept_term)
             if cached:
@@ -195,7 +204,23 @@ PROVIDED CONTENT:
 {content}
 ==================
 
-INSTRUCTIONS:
+INSTRUCTIONS FOR DEFINITION SECTION:
+- Extract primary definition from content
+- Include alternative definitions if mentioned
+- For code_examples: Extract or identify MATLAB code snippets from the content that demonstrate this concept
+  * Look for actual MATLAB code blocks, formulas, or algorithmic descriptions
+  * If found, preserve them exactly as they appear
+  * Format as: "% MATLAB: [code]"
+  * Include at least 2 relevant MATLAB examples if available in content
+  * If MATLAB-specific functions (like fFinancial Toolbox functions) are mentioned, extract those
+- For example_explanation: Provide detailed context explaining:
+  * What each MATLAB code example does
+  * How it relates to the concept
+  * What the expected MATLAB output or result would be
+  * How to use it in MATLAB Financial Toolbox context
+  * Real-world application context in financial analysis using MATLAB
+
+FULL EXTRACTION GUIDELINES:
 - Extract definition, characteristics, applications, and related concepts from the content above
 - All information must come from the provided content only
 - If a section has no relevant information in the content, indicate "Not available in provided content"
@@ -204,7 +229,7 @@ INSTRUCTIONS:
 
 Create a structured note with:
 1. Primary definition (from content, not generated)
-2. Give examples like code snippets and explain with context
+2. Code examples with explanations demonstrating the concept
 3. Alternative definition if mentioned
 4. Context from content
 5. Key characteristics mentioned in content
@@ -253,6 +278,10 @@ Create a structured note with:
                      wikipedia_content: str,
                      structured_note: FinancialConceptNote):
         """Cache a concept in PostgreSQL"""
+        if not self.db:
+            logger.info(f"⚠️ Skipping cache: Database not available")
+            return
+        
         try:
             logger.info(f"Caching concept: {concept_term}")
             self.db.insert_concept(
@@ -411,12 +440,13 @@ Create a structured note with:
                 )
                 
                 # Log the query
-                self.db.log_query(
-                    query,
-                    "wikipedia",
-                    None,
-                    structured_note.model_dump()
-                )
+                if self.db:
+                    self.db.log_query(
+                        query,
+                        "wikipedia",
+                        None,
+                        structured_note.model_dump()
+                    )
                 
                 processing_time = (time.time() - start_time) * 1000
                 

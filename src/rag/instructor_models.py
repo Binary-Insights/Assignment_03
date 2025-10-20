@@ -12,6 +12,8 @@ class Definition(BaseModel):
     primary: str = Field(..., description="Primary definition of the concept")
     alternative: Optional[List[str]] = Field(None, description="Alternative definitions")
     context: str = Field(..., description="Context where this concept is used")
+    code_examples: Optional[List[str]] = Field(None, description="Code snippets (MATLAB) demonstrating the concept")
+    example_explanation: Optional[str] = Field(None, description="Detailed explanation of the code examples with context")
 
 
 class KeyCharacteristics(BaseModel):

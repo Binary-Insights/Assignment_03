@@ -212,6 +212,9 @@ async def get_cached_concepts(limit: int = 50):
     if not pipeline:
         raise HTTPException(status_code=503, detail="Pipeline not initialized")
     
+    if not pipeline.db:
+        raise HTTPException(status_code=503, detail="Database not available - caching disabled")
+    
     try:
         concepts = pipeline.db.get_all_concepts(limit=limit)
         
@@ -249,6 +252,9 @@ async def get_concept_detail(term: str):
     if not pipeline:
         raise HTTPException(status_code=503, detail="Pipeline not initialized")
     
+    if not pipeline.db:
+        raise HTTPException(status_code=503, detail="Database not available - caching disabled")
+    
     try:
         concept = pipeline.db.get_concept(term)
         
@@ -277,6 +283,9 @@ async def get_statistics():
     
     if not pipeline:
         raise HTTPException(status_code=503, detail="Pipeline not initialized")
+    
+    if not pipeline.db:
+        raise HTTPException(status_code=503, detail="Database not available - caching disabled")
     
     try:
         concepts = pipeline.db.get_all_concepts(limit=1000)

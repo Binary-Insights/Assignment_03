@@ -285,6 +285,18 @@ if submit_btn and query.strip():
                         st.markdown(f"\n**Alternative Definition:**\n\n{definition.get('alternative', 'N/A')}")
                     if definition.get('context'):
                         st.markdown(f"\n**Context:**\n\n{definition.get('context', 'N/A')}")
+                    
+                    # Display code examples if available
+                    if definition.get('code_examples'):
+                        st.markdown("\n---")
+                        st.markdown("**MATLAB Code Examples:**")
+                        for i, code_example in enumerate(definition['code_examples'], 1):
+                            st.code(code_example, language="matlab")
+                    
+                    # Display example explanation if available
+                    if definition.get('example_explanation'):
+                        st.markdown("\n**Code Explanation:**")
+                        st.markdown(definition['example_explanation'])
                 else:
                     st.warning("No definition available")
                 st.markdown('</div>', unsafe_allow_html=True)
