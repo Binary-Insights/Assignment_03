@@ -1,17 +1,19 @@
 """
-Streamlit Frontend for MATLAB RAG Assistant
+Streamlit Frontend for Enhanced MATLAB RAG Assistant
 Pure UI layer - communicates with FastAPI backend
-Location: pilots/rag_streamlit_frontend.py
+Supports both original RAG and enhanced RAG (with Wikipedia fallback & structured output)
+Location: src/frontend/rag_streamlit_frontend.py
 """
 
 import streamlit as st
 import requests
 import json
 from typing import Optional
+from datetime import datetime
 
 # Configure Streamlit page
 st.set_page_config(
-    page_title="MATLAB RAG Assistant",
+    page_title="Enhanced MATLAB RAG Assistant",
     page_icon="🧠",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -79,8 +81,8 @@ if 'last_response' not in st.session_state:
     st.session_state.last_response = None
 
 # Title and description
-st.markdown('<div class="main-header">🧠 MATLAB Financial Toolbox RAG Assistant</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtitle">Ask questions about MATLAB Financial Toolbox with AI-powered retrieval</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header">🧠 Enhanced MATLAB RAG Assistant</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitle">Ask questions about MATLAB with AI-powered retrieval, Wikipedia fallback, and structured knowledge extraction</div>', unsafe_allow_html=True)
 
 # Sidebar for configuration and info
 with st.sidebar:
@@ -122,50 +124,50 @@ with st.sidebar:
     
     # Model Settings
     st.subheader("🔧 Model Settings")
-    top_k = st.slider(
-        "Number of context chunks to retrieve:",
+    use_vector_db = st.checkbox("Use Vector DB Search", value=True, help="Search Pinecone vector database first")
+    use_wikipedia = st.checkbox("Allow Wikipedia Fallback", value=True, help="Search Wikipedia if not found in vector DB")
+    
+    st.subheader("📊 Vector DB Results")
+    num_vector_results = st.slider(
+        "Number of Vector DB results to use for structured note:",
         min_value=1,
         max_value=10,
         value=5,
-        help="How many relevant sections to consider from the knowledge base"
+        step=1,
+        help="Using more results provides richer context but may be slower. Set to 1 to use only top result."
     )
     
-    num_context = st.slider(
-        "Context chunks to use in answer:",
-        min_value=1,
-        max_value=top_k,
-        value=min(3, top_k),
-        help="How many of the retrieved chunks to include in the LLM prompt"
-    )
-    
-    temperature = st.slider(
-        "Temperature (creativity):",
-        min_value=0.0,
-        max_value=1.0,
-        value=0.0,
-        step=0.1,
-        help="Lower = more deterministic, Higher = more creative"
-    )
+    st.caption(f"📌 Currently using top-{num_vector_results} result(s) from Pinecone")
     
     st.divider()
     
     st.subheader("📚 About This App")
     st.markdown("""
-    This RAG (Retrieval-Augmented Generation) assistant:
-    - 🔍 Searches MATLAB Financial Toolbox documentation
-    - 📊 Retrieves relevant sections using embeddings
-    - 🤖 Generates answers using GPT-4o
+    This Enhanced RAG assistant:
+    - 🔍 **Vector Search**: Searches Pinecone vector database
+    - 📚 **Wikipedia Fallback**: Falls back to Wikipedia if not found
+    - 🗄️ **Smart Caching**: Caches concepts in PostgreSQL for faster retrieval
+    - 📊 **Structured Output**: Uses Instructor to generate consistent structured notes
+    
+    **3-Tier Search Strategy:**
+    1. **Pinecone Vector DB** → Direct knowledge base search
+    2. **PostgreSQL Cache** → Pre-computed cached results (20-40x faster!)
+    3. **Wikipedia** → Fallback source for new concepts
     
     **Architecture:**
     - 🎨 **Frontend**: Streamlit (this app)
-    - ⚙️ **Backend**: FastAPI server
+    - ⚙️ **Backend**: FastAPI server (enhanced_fastapi_server.py)
     - 🔗 **Communication**: HTTP REST API
+    - 📦 **Databases**: Pinecone + PostgreSQL
     
     **Built with:**
     - OpenAI (embeddings & LLM)
     - Pinecone (vector database)
-    - LangChain (orchestration)
+    - PostgreSQL (concept caching)
+    - Instructor (structured outputs)
+    - Wikipedia API (fallback source)
     """)
+
 
 
 # Main content
@@ -217,9 +219,9 @@ if submit_btn and query.strip():
             st.status("📤 Sending request to FastAPI server...", state="running")
             request_payload = {
                 "query": query,
-                "top_k": top_k,
-                "num_context": num_context,
-                "temperature": temperature
+                "use_vector_db": use_vector_db,
+                "use_wikipedia": use_wikipedia,
+                "num_vector_results": num_vector_results
             }
             
             # Make API call
@@ -250,35 +252,132 @@ if submit_btn and query.strip():
             st.markdown(f"**🎯 Your Question:**\n\n{result['query']}")
             st.markdown('</div>', unsafe_allow_html=True)
             
-            # Answer section
-            st.markdown('<div class="answer-box">', unsafe_allow_html=True)
-            st.markdown(f"**✨ Answer:**\n\n{result['answer']}")
-            st.markdown('</div>', unsafe_allow_html=True)
+            # Metadata section
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                source_label = result.get('source', 'unknown').upper()
+                st.metric("📍 Source", source_label)
+            with col2:
+                is_cached = "✓ Cached" if result.get('cached') else "✗ Not Cached"
+                st.metric("💾 Cache", is_cached)
+            with col3:
+                processing_time = result.get('processing_time_ms', 0)
+                st.metric("⏱️ Time (ms)", f"{processing_time:.0f}")
+            with col4:
+                found_vector = "✓ Found" if result.get('concept_found_in_vector') else "✗ Not Found"
+                st.metric("🔍 Vector DB", found_vector)
             
-            # Metadata
-            st.info(f"📊 Sources Retrieved: {result['num_sources_retrieved']} | Model: {result['model_used']}")
+            # Structured Note section
+            st.markdown("---")
+            st.markdown("### 📚 Structured Knowledge Note")
             
-            # Context section
-            with st.expander("📚 Context Sources (Click to view)", expanded=False):
-                st.markdown('<div class="context-box">', unsafe_allow_html=True)
-                sources = result.get('sources', [])
-                if sources:
-                    for i, source in enumerate(sources, 1):
-                        st.markdown(f"**Source {i}:**")
-                        source_text = source.get('text', 'No text available')
-                        display_text = source_text[:500] + "..." if len(source_text) > 500 else source_text
-                        st.text(display_text)
-                        if source.get('score'):
-                            st.caption(f"Score: {source['score']:.4f}")
-                        st.divider()
+            structured_note = result.get('structured_note', {})
+            
+            # Create tabs for different sections
+            tab1, tab2, tab3, tab4, tab5 = st.tabs(["Definition", "Characteristics", "Applications", "Related Concepts", "Raw JSON"])
+            
+            with tab1:
+                st.markdown('<div class="answer-box">', unsafe_allow_html=True)
+                if 'definition' in structured_note:
+                    definition = structured_note['definition']
+                    st.markdown(f"**Primary Definition:**\n\n{definition.get('primary', 'N/A')}")
+                    if definition.get('alternative'):
+                        st.markdown(f"\n**Alternative Definition:**\n\n{definition.get('alternative', 'N/A')}")
+                    if definition.get('context'):
+                        st.markdown(f"\n**Context:**\n\n{definition.get('context', 'N/A')}")
                 else:
-                    st.warning("No sources available")
+                    st.warning("No definition available")
                 st.markdown('</div>', unsafe_allow_html=True)
+            
+            with tab2:
+                st.markdown('<div class="context-box">', unsafe_allow_html=True)
+                if 'key_characteristics' in structured_note:
+                    chars = structured_note['key_characteristics']
+                    if chars.get('characteristics'):
+                        st.markdown("**Key Characteristics:**")
+                        for i, char in enumerate(chars['characteristics'], 1):
+                            st.markdown(f"  {i}. {char}")
+                    if chars.get('importance'):
+                        st.markdown(f"\n**Importance:** {chars['importance']}")
+                else:
+                    st.warning("No characteristics available")
+                st.markdown('</div>', unsafe_allow_html=True)
+            
+            with tab3:
+                st.markdown('<div class="context-box">', unsafe_allow_html=True)
+                if 'applications' in structured_note:
+                    apps = structured_note['applications']
+                    if apps.get('use_cases'):
+                        st.markdown("**Use Cases:**")
+                        for i, use_case in enumerate(apps['use_cases'], 1):
+                            st.markdown(f"  {i}. {use_case}")
+                    if apps.get('industry_examples'):
+                        st.markdown("\n**Industry Examples:**")
+                        for i, example in enumerate(apps['industry_examples'], 1):
+                            st.markdown(f"  {i}. {example}")
+                    if apps.get('matlab_relevance'):
+                        st.markdown(f"\n**MATLAB Relevance:** {apps['matlab_relevance']}")
+                else:
+                    st.warning("No applications available")
+                st.markdown('</div>', unsafe_allow_html=True)
+            
+            with tab4:
+                st.markdown('<div class="context-box">', unsafe_allow_html=True)
+                if 'related_concepts' in structured_note:
+                    related = structured_note['related_concepts']
+                    if related.get('related_terms'):
+                        st.markdown("**Related Terms:**")
+                        for i, term in enumerate(related['related_terms'], 1):
+                            st.markdown(f"  {i}. {term}")
+                    if related.get('relationships'):
+                        st.markdown("\n**Relationships:**")
+                        for i, rel in enumerate(related['relationships'], 1):
+                            st.markdown(f"  {i}. {rel}")
+                else:
+                    st.warning("No related concepts available")
+                st.markdown('</div>', unsafe_allow_html=True)
+            
+            with tab5:
+                st.json(structured_note)
+            
+            # Source context section
+            st.markdown("---")
+            with st.expander("📖 Source Context", expanded=False):
+                if result.get('source') == 'vector_db' and result.get('pinecone_context'):
+                    st.markdown("**Context from Vector DB:**")
+                    st.markdown(f"**Number of Results Used**: {num_vector_results}")
+                    st.markdown("---")
+                    # Display full context without truncation
+                    st.text_area(
+                        "Vector DB Results:",
+                        value=result['pinecone_context'],
+                        height=300,
+                        disabled=True,
+                        label_visibility="collapsed"
+                    )
+                elif result.get('source') == 'wikipedia' and result.get('wikipedia_context'):
+                    st.markdown("**Context from Wikipedia:**")
+                    st.text_area(
+                        "Wikipedia Context:",
+                        value=result['wikipedia_context'],
+                        height=300,
+                        disabled=True,
+                        label_visibility="collapsed"
+                    )
+                else:
+                    st.info("No source context available")
+            
+            # Confidence score
+            if structured_note.get('confidence_score'):
+                confidence = structured_note['confidence_score']
+                st.markdown(f"**Confidence Score:** {confidence:.1%}")
+                st.progress(confidence)
+
     
     except requests.exceptions.ConnectionError:
         st.error(f"❌ Cannot connect to FastAPI server at {st.session_state.api_url}")
         st.info("Make sure the backend server is running:")
-        st.code("python -m uvicorn backends.rag_fastapi_server:app --reload --host localhost --port 8000")
+        st.code("python enhanced_fastapi_server.py")
     except requests.exceptions.Timeout:
         st.error("❌ Request timed out. The server may be overloaded.")
     except Exception as e:
@@ -306,7 +405,7 @@ if st.session_state.last_response and not submit_btn:
 st.divider()
 st.markdown("""
 <div style="text-align: center; color: #666; font-size: 0.9em;">
-    <p>MATLAB Financial Toolbox RAG Assistant</p>
-    <p>Frontend: Streamlit | Backend: FastAPI | Database: Pinecone | LLM: OpenAI</p>
+    <p>Enhanced MATLAB RAG Assistant with Wikipedia Fallback & PostgreSQL Caching</p>
+    <p>Frontend: Streamlit | Backend: FastAPI | Vector DB: Pinecone | Cache: PostgreSQL | LLM: OpenAI</p>
 </div>
 """, unsafe_allow_html=True)

@@ -212,16 +212,15 @@ def generate_answer(query: str, context: str, temperature: float = 0.0) -> str:
         logger.info(f"Generating answer with temperature={temperature}")
         
         prompt_template = """Use the following pieces of context to answer the question at the end.
-Answer only based on the context given.
-If you don't know the answer, just say that you don't know.
-Use three sentences maximum and keep the answer concise.
+                        Answer only based on the context given.
+                        If you don't know the answer, just say that you don't know.
 
-CONTEXT:
-{context}
+                        CONTEXT:
+                        {context}
 
-QUESTION: {question}
+                        QUESTION: {question}
 
-ANSWER:"""
+                        ANSWER:"""
         
         prompt = PromptTemplate.from_template(prompt_template)
         formatted_prompt = prompt.format(context=context, question=query)
