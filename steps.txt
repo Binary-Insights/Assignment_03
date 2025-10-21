@@ -14,6 +14,9 @@ Streamlit: http://18.219.43.192:8501
 ----------------------------------------------- LAB - 01 -------------------------------------
 
 # Step 1
+## Spliting pdf
+python src/parse/pdf_splitter.py data/raw/FINTBX/pdf/fintbx.pdf --size 3 --output data/raw
+
 ## Parsing 
 # It creates parsing_provenance.json
 # It reads the downloaded pdf's and parses into text, tables, figures,.. etc using Docling
