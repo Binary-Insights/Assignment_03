@@ -68,7 +68,7 @@ python -m uvicorn backends.rag_fastapi_server:app --reload --host localhost --po
 ----------------------------------------------- LAB - 04 -------------------------------------
 
 # Installation
-pip install psycopg2-binary wikipedia instructor langchain-openai pinecone fastapi uvicorn python-dotenv streamlit
+pip install psycopg2-binary wikipedia instructor langchain-openai pinecone fastapi uvicorn python-dotenv streamlit pymupdf
 
 
 # Database Setup:
@@ -84,6 +84,9 @@ python -m src.backends.enhanced_fastapi_server
 
 # To run backend
 python run_fastapi.py
+
+# To run frontend
+streamlit run src/frontend/rag_streamlit_frontend.py 
 
 pip install -U pip pip-tools pipdeptree
 
