@@ -1,36 +1,70 @@
-# Use Airflow 2.10.4 with Python 3.11
+# ===============================================
+#   Dockerfile for Airflow + Docling OCR Parser
+# ===============================================
+# Base image: Airflow 2.10.4 with Python 3.11
 FROM apache/airflow:2.10.4-python3.11
 
-ENV PIP_DISABLE_PIP_VERSION_CHECK=1 PIP_DEFAULT_TIMEOUT=100
-
+# ----------------------------
+# System and environment setup
+# ----------------------------
 USER root
+ENV DEBIAN_FRONTEND=noninteractive \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_DEFAULT_TIMEOUT=100
+
+# Install system dependencies for PDF parsing, OCR, and OpenGL rendering
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl build-essential git poppler-utils tesseract-ocr libmagic1 \
-    && rm -rf /var/lib/apt/lists/*
+    build-essential \
+    git \
+    curl \
+    poppler-utils \
+    ghostscript \
+    tesseract-ocr \
+    libmagic1 \
+    libgl1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxrender1 \
+    libxext6 \
+    ffmpeg \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
+
+# ----------------------------
+# Switch back to airflow user
+# ----------------------------
 USER airflow
 
-# Airflow 2.10.4 constraints for Python 3.11
+# ----------------------------
+# Airflow core + Amazon provider
+# ----------------------------
 ARG AIRFLOW_VERSION=2.10.4
 ARG PYTHON_VERSION=3.11
 ARG CONSTRAINTS_URL="https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION}.txt"
 
-# (Optional) keep for reference
-COPY pyproject.toml /tmp/
-
-# 1) Upgrade pip once
-RUN python -m pip install --upgrade pip
-
-# 2) Install Airflow-related extras UNDER CONSTRAINTS
-RUN pip install --no-cache-dir --prefer-binary -c ${CONSTRAINTS_URL} \
+RUN python -m pip install --upgrade pip setuptools wheel \
+ && pip install --no-cache-dir --prefer-binary -c ${CONSTRAINTS_URL} \
+    apache-airflow \
     apache-airflow-providers-amazon
 
-# 3) Install AWS SDKs with compatible pins (avoids botocore churn)
-#    If you don't need the CLI inside the container, OMIT awscli entirely.
+# ----------------------------
+# AWS SDKs and utilities
+# ----------------------------
 RUN pip install --no-cache-dir --prefer-binary \
     "boto3>=1.34,<2" \
     "awscli>=1.32,<2"
 
-# 4) Install the rest (not tightly coupled to Airflow)
+# ----------------------------
+# Core scientific stack (safe ABI pins)
+# ----------------------------
+# Prevents "numpy.dtype size changed" errors.
+RUN pip install --no-cache-dir --prefer-binary \
+    "numpy==1.26.4" \
+    "pandas==2.2.2"
+
+# ----------------------------
+# App-specific and parsing dependencies
+# ----------------------------
 RUN pip install --no-cache-dir --prefer-binary \
     instructor \
     openai \
@@ -47,3 +81,24 @@ RUN pip install --no-cache-dir --prefer-binary \
     "uvicorn[standard]>=0.27,<1" \
     "streamlit>=1.39.0" \
     "transformers>=4.34,<5"
+
+# ----------------------------
+# Optional: OCR / ML accelerators
+# ----------------------------
+# Try GPU runtime first; fallback to CPU if unavailable
+RUN pip install --no-cache-dir --prefer-binary "onnxruntime-gpu>=1.23.0" || echo "GPU runtime skipped"
+RUN pip install --no-cache-dir --prefer-binary "onnxruntime>=1.17,<2"
+
+# OCR engines (RapidOCR + EasyOCR)
+RUN pip install --no-cache-dir --prefer-binary "rapidocr-onnxruntime>=1.3.0" easyocr
+
+# ----------------------------
+# Workspace structure
+# ----------------------------
+WORKDIR /opt/airflow/workspace
+ENV PYTHONPATH="/opt/airflow/workspace"
+
+
+# Copy all workspace files (DAGs, src/, data/, etc.)
+COPY . /opt/airflow/workspace
+

@@ -51,6 +51,9 @@ x-airflow-common:
   # Comment the image line, place your Dockerfile in the directory where you placed the docker-compose.yaml
   # and uncomment the "build" line below, Then run `docker-compose build` to build the images.
   # image: ${AIRFLOW_IMAGE_NAME:-apache/airflow:2.7.0}
+  build:
+    context: .
+    dockerfile: Dockerfile
   image: assignment03:latest
   environment:
     &airflow-common-env
@@ -85,15 +88,15 @@ x-airflow-common:
   volumes:
     - ${AIRFLOW_PROJ_DIR:-.}/src/dags:/opt/airflow/dags
     - ${AIRFLOW_PROJ_DIR:-.}/src/parse:/opt/airflow/src/parse
-    - ${AIRFLOW_PROJ_DIR:-.}/data/raw:/opt/airflow/data/raw
+    - ${AIRFLOW_PROJ_DIR:-.}/data:/opt/airflow/data
     - ${AIRFLOW_PROJ_DIR:-.}/data/logs:/opt/airflow/data/logs
     - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
     - ${AIRFLOW_PROJ_DIR:-.}/data/airflow/logs:/opt/airflow/logs
     - ${AIRFLOW_PROJ_DIR:-.}/data/airflow/config:/opt/airflow/config
     - ${AIRFLOW_PROJ_DIR:-.}/data/airflow/plugins:/opt/airflow/plugins
     - ${AIRFLOW_PROJ_DIR:-.}:/opt/airflow/workspace
-#   - ${AIRFLOW_PROJ_DIR:-.}/data/huggingface_cache:/home/airflow/.cache/huggingface
-#   - ${AIRFLOW_PROJ_DIR:-.}/data/deepsearch_models:/home/airflow/.cache/deepsearch_glm
+    - ${AIRFLOW_PROJ_DIR:-.}/data/huggingface_cache:/home/airflow/.cache/huggingface
+    - ${AIRFLOW_PROJ_DIR:-.}/data/deepsearch_models:/home/airflow/.cache/deepsearch_glm
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     &airflow-common-depends-on
