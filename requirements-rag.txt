@@ -10,10 +10,11 @@ streamlit==1.28.1
 requests==2.31.0
 
 # LangChain & LLM Integration
-langchain==0.0.350
-langchain-core==0.0.11
+# Note: Do not pin `langchain` here to allow pip to resolve a compatible
+# version that matches `langchain-core` and `langchain-openai`.
+langchain-core>=0.1,<0.2
 langchain-openai==0.0.8
-langchain-anthropic==0.1.5
+#langchain-anthropic==0.1.5
 langchain-text-splitters==0.0.1
 
 # Vector Database

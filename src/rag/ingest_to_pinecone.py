@@ -78,36 +78,38 @@ class PineconeIngestion:
     def prepare_vectors(self, chunks: List[Dict[str, Any]], embeddings: List[List[float]]) -> List[tuple]:
         """Prepare vectors for Pinecone upsert"""
         print(f"\n📦 Preparing vectors for Pinecone...")
-        
+
         vectors = []
-        
+
         for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
-            # Validate embedding dimension
+            # Validate embedding dimension first
             if len(embedding) != self.embedding_dimension:
                 print(f"⚠ Warning: Embedding {i} has dimension {len(embedding)}, expected {self.embedding_dimension}")
                 continue
-            
-            # Create metadata (exclude text to save space)
-            metadata = {
-                k: v for k, v in chunk.items() 
+
+            # Build base metadata from the chunk
+            base_metadata = {
+                k: v for k, v in chunk.items()
                 if k not in ["text", "chunk_id", "embedding"] and v is not None
             }
-            
-            # Add text separately for retrieval
-            metadata["text"] = chunk.get("text", "")[:1000]  # Limit text to 1000 chars
-            
+
+            # Keep only primitive types (Pinecone requirement)
+            metadata = {k: v for k, v in base_metadata.items() if isinstance(v, (str, int, float, bool))}
+
+            # Add text (trim to keep metadata small)
+            metadata["text"] = chunk.get("text", "")[:1000]
+
             # Create vector tuple: (id, embedding, metadata)
             vector = (
                 chunk.get("chunk_id", f"chunk_{i:06d}"),
                 embedding,
                 metadata
             )
-            
             vectors.append(vector)
-        
+
         print(f"✓ Prepared {len(vectors)} vectors")
         return vectors
-    
+   
     def upsert_to_pinecone(self, vectors: List[tuple], batch_size: int = 100):
         """Upsert vectors to Pinecone"""
         print(f"\n⬆️  Upserting {len(vectors)} vectors to Pinecone...")

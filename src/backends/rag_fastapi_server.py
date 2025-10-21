@@ -433,7 +433,7 @@ async def root():
             "docs": "/docs (GET)",
             "openapi": "/openapi.json (GET)"
         },
-        "instructions": "Start Streamlit frontend separately with: streamlit run pilots/rag_streamlit_frontend.py"
+        "instructions": "Start Streamlit frontend separately with: streamlit run src/frontend/rag_streamlit_frontend.py"
     }
 
 
@@ -458,7 +458,7 @@ if __name__ == "__main__":
     print("\nStarting server on http://localhost:8000")
     print("API Documentation available at http://localhost:8000/docs")
     print("\nTo run Streamlit frontend separately:")
-    print("  streamlit run pilots/rag_streamlit_frontend.py")
+    print("  streamlit run src/frontend/rag_streamlit_frontend.py")
     print("\n" + "=" * 70 + "\n")
     
     # Run with: python -m uvicorn backends.rag_fastapi_server:app --reload --host localhost --port 8000

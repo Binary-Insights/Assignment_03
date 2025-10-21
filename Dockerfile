@@ -1,18 +1,12 @@
 # ===============================================
-#   Dockerfile for Airflow + Docling OCR Parser
+# Airflow + Docling + Pinecone (managed by uv)
 # ===============================================
-# Base image: Airflow 2.10.4 with Python 3.11
 FROM apache/airflow:2.10.4-python3.11
 
-# ----------------------------
-# System and environment setup
-# ----------------------------
 USER root
-ENV DEBIAN_FRONTEND=noninteractive \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PIP_DEFAULT_TIMEOUT=100
+ENV DEBIAN_FRONTEND=noninteractive
 
-# Install system dependencies for PDF parsing, OCR, and OpenGL rendering
+# ---- System dependencies for Docling, OCR, and visualization ----
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     git \
@@ -27,78 +21,38 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxrender1 \
     libxext6 \
     ffmpeg \
- && apt-get clean \
- && rm -rf /var/lib/apt/lists/*
+ && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# ----------------------------
-# Switch back to airflow user
-# ----------------------------
+# ---- Install uv package manager ----
+RUN pip install --no-cache-dir uv
+
+# Switch to airflow user (Airflow images run as non-root)
 USER airflow
 
-# ----------------------------
-# Airflow core + Amazon provider
-# ----------------------------
-ARG AIRFLOW_VERSION=2.10.4
-ARG PYTHON_VERSION=3.11
-ARG CONSTRAINTS_URL="https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION}.txt"
-
-RUN python -m pip install --upgrade pip setuptools wheel \
- && pip install --no-cache-dir --prefer-binary -c ${CONSTRAINTS_URL} \
-    apache-airflow \
-    apache-airflow-providers-amazon
-
-# ----------------------------
-# AWS SDKs and utilities
-# ----------------------------
-RUN pip install --no-cache-dir --prefer-binary \
-    "boto3>=1.34,<2" \
-    "awscli>=1.32,<2"
-
-# ----------------------------
-# Core scientific stack (safe ABI pins)
-# ----------------------------
-# Prevents "numpy.dtype size changed" errors.
-RUN pip install --no-cache-dir --prefer-binary \
-    "numpy==1.26.4" \
-    "pandas==2.2.2"
-
-# ----------------------------
-# App-specific and parsing dependencies
-# ----------------------------
-RUN pip install --no-cache-dir --prefer-binary \
-    instructor \
-    openai \
-    "pydantic>=2.6,<3" \
-    requests \
-    beautifulsoup4 \
-    python-dotenv \
-    "dvc[s3]>=3.63.0" \
-    "lxml>=4.9.3" \
-    docling==2.57.0 \
-    psutil \
-    "pymupdf>=1.26.5" \
-    "fastapi>=0.119.0" \
-    "uvicorn[standard]>=0.27,<1" \
-    "streamlit>=1.39.0" \
-    "transformers>=4.34,<5"
-
-# ----------------------------
-# Optional: OCR / ML accelerators
-# ----------------------------
-# Try GPU runtime first; fallback to CPU if unavailable
-RUN pip install --no-cache-dir --prefer-binary "onnxruntime-gpu>=1.23.0" || echo "GPU runtime skipped"
-RUN pip install --no-cache-dir --prefer-binary "onnxruntime>=1.17,<2"
-
-# OCR engines (RapidOCR + EasyOCR)
-RUN pip install --no-cache-dir --prefer-binary "rapidocr-onnxruntime>=1.3.0" easyocr
-
-# ----------------------------
-# Workspace structure
-# ----------------------------
+# ---- Workspace setup ----
 WORKDIR /opt/airflow/workspace
 ENV PYTHONPATH="/opt/airflow/workspace"
 
+# ---- Copy dependency file first for caching ----
+COPY pyproject.toml ./
 
-# Copy all workspace files (DAGs, src/, data/, etc.)
+# ---- Install dependencies (RAG + pipeline deps) using uv ----
+RUN uv pip install --system \
+      "langchain-core>=0.3.0,<1.0" \
+      "langchain-text-splitters>=0.3.0,<1.0" \
+      "langchain-openai>=0.2.0,<1.0" \
+      "openai>=1.37,<2.0" \
+      "pinecone-client>=5.0,<6.0" \
+      "fastapi>=0.110,<1.0" \
+      "uvicorn[standard]>=0.27,<1.0" \
+      "requests>=2.31,<3.0" \
+      "httpx>=0.27,<1.0" \
+      "aiohttp>=3.9,<4.0" \
+      "python-dotenv>=1.0,<2.0" \
+      "pydantic>=2.6,<3.0" \
+      "pydantic-settings>=2.2,<3.0" \
+      "streamlit>=1.32,<2.0" \
+      "tqdm>=4.66,<5.0"
+
+# ---- Copy project source code ----
 COPY . /opt/airflow/workspace
-
