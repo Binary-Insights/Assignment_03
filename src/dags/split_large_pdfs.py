@@ -10,12 +10,18 @@ from airflow.operators.python import PythonOperator
 # ----- Configuration -----
 PROJECT_ROOT = Path(os.environ.get("PROJECT_ROOT", "/opt/airflow"))
 RAW_DIR = str(PROJECT_ROOT / "data" / "raw")
+PDF_DIR = str(PROJECT_ROOT / "data" / "raw" / "FINTBX" / "pdf")
 PDF_SPLITTER_PATH = str(PROJECT_ROOT / "src" / "parse" / "pdf_splitter.py")
 PAGES_PER_SPLIT = 100  # default split every 100 pages
 
 def _already_split(pdf_path: str) -> bool:
     """Skip if already split (idempotency)."""
     p = Path(pdf_path)
+    
+    # Skip if this is already a split chunk (matches _part_NNN pattern)
+    if "_part_" in p.stem:
+        return True
+    
     split_dir = p.parent / "split_pdfs"
     return (split_dir / f"{p.stem}_part_001.pdf").exists() or (split_dir / "split_manifest.json").exists()
 
@@ -34,10 +40,11 @@ def _infer_ticker(pdf_path: str):
     except Exception:
         return None
 
-def find_pdfs(raw_dir=RAW_DIR):
-    """Find all PDFs not already split."""
+def find_pdfs(pdf_dir=PDF_DIR):
+    """Find all PDFs in the main PDF directory (not in subdirectories)."""
     pdfs = []
-    for path in glob.glob(os.path.join(raw_dir, "**", "*.pdf"), recursive=True):
+    # Search only in the main directory, not recursively
+    for path in glob.glob(os.path.join(pdf_dir, "*.pdf")):
         try:
             if not _already_split(path):
                 pdfs.append(path)
