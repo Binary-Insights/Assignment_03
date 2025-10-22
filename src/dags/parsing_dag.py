@@ -80,7 +80,9 @@ with DAG(
     def parse_ticker_sequential(job: Dict) -> str:
         """
         For one ticker, run the parser sequentially on each part:
-          python src/parse/docling_extractor_v2.py {RAW_ROOT_REL}/{TICKER}/pdf/split_pdfs --pdf <part>
+          /opt/venv_docling/bin/python src/parse/docling_extractor_v2.py {RAW_ROOT_REL}/{TICKER}/pdf/split_pdfs --pdf <part>
+        
+        Uses isolated docling virtual environment to avoid dependency conflicts
         """
         ticker: str = job["ticker"]
         parts: List[str] = job["parts"]
@@ -92,8 +94,9 @@ with DAG(
         logger.info("Starting parsing for %s: %d part(s)", ticker, len(parts))
         ok = 0
         for i, part in enumerate(parts, start=1):
+            # Use isolated docling venv for execution
             cmd = [
-                "python",
+                "/opt/venv_docling/bin/python",
                 script_rel,
                 str(relative_folder).replace("\\", "/"),
                 "--pdf",
@@ -101,9 +104,11 @@ with DAG(
             ]
             logger.info("[%s] (%d/%d) Running: %s", ticker, i, len(parts), " ".join(cmd))
 
-            # If your docling script needs env vars (e.g., to know parsed root), pass them here
+            # Setup environment with docling venv in PATH
             env = os.environ.copy()
-            env["PARSED_ROOT"] = str(BASE_DIR / PARSED_ROOT_REL)  # harmless if script ignores it
+            env["PARSED_ROOT"] = str(BASE_DIR / PARSED_ROOT_REL)
+            env["PYTHONPATH"] = f"{str(BASE_DIR)}:/opt/venv_docling/lib/python3.11/site-packages"
+            env["PATH"] = f"/opt/venv_docling/bin:{env.get('PATH', '')}"
 
             try:
                 res = subprocess.run(
