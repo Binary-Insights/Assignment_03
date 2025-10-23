@@ -111,20 +111,7 @@ USER airflow
 
 # Install docling + its dependencies in isolated venv
 RUN /opt/venv_docling/bin/pip install --upgrade pip setuptools wheel && \
-    /opt/venv_docling/bin/pip install uv && \
-    /opt/venv_docling/bin/uv pip install \
-    "docling==2.57.0" \
-    "docling-core>=2.8.0" \
-    "docling-parse>=2.4.0" \
-    "pillow>=10.0.0" \
-    "pdf2image>=1.16.0" \
-    "rapidocr-onnxruntime>=1.3.0" \
-    "easyocr>=1.6.0" \
-    "opencv-python>=4.8.0" \
-    "numpy>=1.24.0" \
-    "pydantic>=2.0.0" \
-    "torch>=2.0.0" \
-    "torchvision>=0.15.0"
+    /opt/venv_docling/bin/pip install "docling==2.58.0"
 
 # Create wrapper scripts for docling execution
 USER root
@@ -159,3 +146,18 @@ ENV PATH="/opt/scripts:$PATH"
 
 # Copy all workspace files (DAGs, src/, data/, etc.)
 COPY . /opt/airflow/workspace
+
+# Create initialization script that runs before services start
+RUN mkdir -p /opt/airflow/scripts && \
+    echo '#!/bin/bash' > /opt/airflow/scripts/init_services.sh && \
+    echo 'set -e' >> /opt/airflow/scripts/init_services.sh && \
+    echo 'echo "Initializing PostgreSQL database..."' >> /opt/airflow/scripts/init_services.sh && \
+    echo 'python /opt/airflow/workspace/setup/init_database.py' >> /opt/airflow/scripts/init_services.sh && \
+    echo 'echo "✓ Database initialization complete"' >> /opt/airflow/scripts/init_services.sh && \
+    chmod +x /opt/airflow/scripts/init_services.sh
+
+USER root
+RUN chown airflow /opt/airflow/scripts/init_services.sh
+
+USER airflow
+
