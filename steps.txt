@@ -105,14 +105,45 @@ docker inspect assignment_03-postgres-1 | findstr "IPAddress"
 
 
 
+# -------------------------------- Setup EC2 -----------------------------------------------
+
+# SSH into EC2 instance 
+# get the Public IPv4 address
+ssh -i ~/bigdata-assignment-03.pem ubuntu@IPv4address
+
+# Clone the Github project in EC2 instance
+https://github.com/Binary-Insights/Assignment_03.git
+
+# Start the Docker 
+docker-compose up -d 
+
+# Restart the docker if 
+
+1. After changing environment variables or .env files
+(Containers need to reload new values.)
+
+2. After updating your code or configuration files
+(If you rebuilt your app, changed source code, or edited config files mounted into containers.)
+
+3. After updating your Dockerfile or docker-compose.yaml
+(To rebuild images and apply new settings.)
+
+4. If containers crash or become unresponsive
+(Restarting can recover from errors or resource issues.)
+
+5. After installing or updating system dependencies on the host
+(E.g., new versions of Docker, system libraries, or kernel updates.)
+
+6. After running docker system prune or cleaning up images/volumes
+(To ensure containers use the latest resources.)
+
+7. When you want to free up resources or clear logs
+(Restarting can help reclaim memory or disk space.)
 
 
 
 
-
-
-
-
+Summary:
 ----------------------------------------------- Prompt Text -------------------------------------
 """
 Based on the following content about "{concept_term}", extract and structure the key financial information,
