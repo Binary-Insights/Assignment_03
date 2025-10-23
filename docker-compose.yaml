@@ -92,7 +92,7 @@ x-airflow-common:
     - ${AIRFLOW_PROJ_DIR:-.}/data/logs:/opt/airflow/data/logs
     - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
     - ${AIRFLOW_PROJ_DIR:-.}/data/airflow/logs:/opt/airflow/logs
-    - ${AIRFLOW_PROJ_DIR:-.}/data/airflow/config:/opt/airflow/config
+    # - ${AIRFLOW_PROJ_DIR:-.}/data/airflow/config:/opt/airflow/config
     - ${AIRFLOW_PROJ_DIR:-.}/data/airflow/plugins:/opt/airflow/plugins
     - ${AIRFLOW_PROJ_DIR:-.}:/opt/airflow/workspace
     - ${AIRFLOW_PROJ_DIR:-.}/data/huggingface_cache:/home/airflow/.cache/huggingface
