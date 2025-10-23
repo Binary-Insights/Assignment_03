@@ -94,11 +94,11 @@ streamlit run src/frontend/rag_streamlit_frontend.py
 
 pip install -U pip pip-tools pipdeptree
 
-
-
-
-
-
+docker inspect assignment_03-postgres-1 | findstr "IPAddress"
+(base) PS C:\Users\enigm\OneDrive\Documents\NortheasternAssignments\09_BigDataIntelAnlytics\Assignments\Assignment_03> docker inspect assignment_03-postgres-1 | findstr "IPAddress"
+            "SecondaryIPAddresses": null,
+            "IPAddress": "",
+                    "IPAddress": "172.18.0.3",
 
 
 

@@ -82,7 +82,7 @@ with DAG(
         For one ticker, run the parser sequentially on each part:
           /opt/venv_docling/bin/python src/parse/docling_extractor_v2.py {RAW_ROOT_REL}/{TICKER}/pdf/split_pdfs --pdf <part>
         
-        Uses isolated docling virtual environment to avoid dependency conflicts
+        Uses isolated docling virtual environment to avoid dependency conflicts with instructor/openai
         """
         ticker: str = job["ticker"]
         parts: List[str] = job["parts"]
@@ -94,7 +94,7 @@ with DAG(
         logger.info("Starting parsing for %s: %d part(s)", ticker, len(parts))
         ok = 0
         for i, part in enumerate(parts, start=1):
-            # Use isolated docling venv for execution
+            # Use isolated docling venv to avoid dependency conflicts
             cmd = [
                 "/opt/venv_docling/bin/python",
                 script_rel,

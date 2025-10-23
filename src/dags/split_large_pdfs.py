@@ -46,7 +46,9 @@ def find_pdfs(pdf_dir=PDF_DIR):
     # Search only in the main directory, not recursively
     for path in glob.glob(os.path.join(pdf_dir, "*.pdf")):
         try:
-            if not _already_split(path):
+            already_split = _already_split(path)
+            print(f"[DEBUG] Found PDF: {path}, already_split={already_split}")
+            if not already_split:
                 pdfs.append(path)
         except OSError:
             continue
