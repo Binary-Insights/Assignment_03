@@ -74,9 +74,20 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+import os
+
 # Initialize session state for API URL and responses
 if 'api_url' not in st.session_state:
-    st.session_state.api_url = "http://localhost:8000"
+    # Use environment variable if available (Docker), otherwise default to localhost
+    api_host = os.getenv("FASTAPI_HOST", "localhost")
+    api_port = os.getenv("FASTAPI_PORT", "8000")
+    default_url = f"http://{api_host}:{api_port}"
+    st.session_state.api_url = default_url
+    st.session_state.default_api_url = default_url
+    print(f"[DEBUG] Initialized API URL: {default_url}")
+    print(f"[DEBUG] FASTAPI_HOST env: {api_host}")
+    print(f"[DEBUG] FASTAPI_PORT env: {api_port}")
+    
 if 'last_response' not in st.session_state:
     st.session_state.last_response = None
 
@@ -87,6 +98,19 @@ st.markdown('<div class="subtitle">Ask questions about MATLAB with AI-powered re
 # Sidebar for configuration and info
 with st.sidebar:
     st.header("⚙️ Configuration")
+    
+    # Display current API URL
+    st.write(f"**API URL**: `{st.session_state.api_url}`")
+    
+    # Allow users to override API URL
+    custom_api_url = st.text_input(
+        "Override API URL (if needed)",
+        value=st.session_state.api_url,
+        help="Change this if the API is running on a different host/port"
+    )
+    if custom_api_url != st.session_state.api_url:
+        st.session_state.api_url = custom_api_url
+        st.info(f"✓ API URL updated to: {custom_api_url}")
     
     # API URL configuration
     st.subheader("🔌 API Configuration")

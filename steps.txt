@@ -16,6 +16,7 @@ Streamlit: http://18.219.43.192:8501
 # Step 1
 ## Spliting pdf
 python src/parse/pdf_splitter.py data/raw/FINTBX/pdf/fintbx.pdf --size 3 --output data/raw
+python src/parse/pdf_splitter.py data/raw/FINTBX/pdf/fintbx.pdf --pages 100 --output data/raw
 
 ## Parsing 
 # It creates parsing_provenance.json
@@ -43,6 +44,9 @@ python src/parse/pdf_generator_v2.py "data/parsed/FINTBX/fintbx_part_001/docling
 
 # Does chunking part of Lab 1 
 
+# To generate chunks using different stategies
+python src/rag/experimental_framework.py 
+
 # Gives a summary of pinecone integration
 python src/rag/pinecone_integration.py
 
@@ -68,7 +72,7 @@ python -m uvicorn backends.rag_fastapi_server:app --reload --host localhost --po
 ----------------------------------------------- LAB - 04 -------------------------------------
 
 # Installation
-pip install psycopg2-binary wikipedia instructor langchain-openai pinecone fastapi uvicorn python-dotenv streamlit pymupdf
+pip install psycopg2-binary wikipedia instructor langchain-openai pinecone fastapi uvicorn python-dotenv streamlit pymupdf langchain_text_splitters
 
 
 # Database Setup:
@@ -90,11 +94,11 @@ streamlit run src/frontend/rag_streamlit_frontend.py
 
 pip install -U pip pip-tools pipdeptree
 
-
-
-
-
-
+docker inspect assignment_03-postgres-1 | findstr "IPAddress"
+(base) PS C:\Users\enigm\OneDrive\Documents\NortheasternAssignments\09_BigDataIntelAnlytics\Assignments\Assignment_03> docker inspect assignment_03-postgres-1 | findstr "IPAddress"
+            "SecondaryIPAddresses": null,
+            "IPAddress": "",
+                    "IPAddress": "172.18.0.3",
 
 
 

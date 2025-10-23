@@ -58,12 +58,22 @@ class EnhancedRAGPipeline:
         
         # Initialize database
         try:
+            # For Docker: use "postgres" database first to create "concept_db" if needed
+            # For local: use direct concept_db connection
+            db_host = os.getenv("DB_HOST", "postgres")
+            db_port = int(os.getenv("DB_PORT", 5432))
+            db_name = os.getenv("DB_NAME", "concept_db")
+            db_user = os.getenv("DB_USER", "airflow")
+            db_password = os.getenv("DB_PASSWORD", "airflow")
+            
+            logger.info(f"Connecting to database: {db_user}@{db_host}:{db_port}/{db_name}")
+            
             self.db = ConceptDatabase(
-                host=os.getenv("DB_HOST", "localhost"),
-                port=int(os.getenv("DB_PORT", 5432)),
-                database=os.getenv("DB_NAME", "concept_db"),
-                user=os.getenv("DB_USER", "postgres"),
-                password=os.getenv("DB_PASSWORD", "postgres")
+                host=db_host,
+                port=db_port,
+                database=db_name,
+                user=db_user,
+                password=db_password
             )
             self.db.connect()
             self.db.initialize_schema()

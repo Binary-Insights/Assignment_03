@@ -33,10 +33,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
 
+# Install uv (fast Python package manager)
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+
 # ----------------------------
 # Switch back to airflow user
 # ----------------------------
 USER airflow
+ENV PATH="/root/.cargo/bin:$PATH"
 
 # ----------------------------
 # Airflow core + Amazon provider (main .venv)
@@ -46,14 +50,14 @@ ARG PYTHON_VERSION=3.11
 ARG CONSTRAINTS_URL="https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION}.txt"
 
 RUN python -m pip install --upgrade pip setuptools wheel \
- && pip install --no-cache-dir --prefer-binary -c ${CONSTRAINTS_URL} \
+ && uv pip install -c ${CONSTRAINTS_URL} \
     apache-airflow \
     apache-airflow-providers-amazon
 
 # ----------------------------
 # AWS SDKs and utilities
 # ----------------------------
-RUN pip install --no-cache-dir --prefer-binary \
+RUN uv pip install \
     "boto3>=1.34,<2" \
     "awscli>=1.32,<2"
 
@@ -61,14 +65,14 @@ RUN pip install --no-cache-dir --prefer-binary \
 # Core scientific stack (safe ABI pins)
 # ----------------------------
 # Prevents "numpy.dtype size changed" errors.
-RUN pip install --no-cache-dir --prefer-binary \
+RUN uv pip install \
     "numpy==1.26.4" \
     "pandas==2.2.2"
 
 # ----------------------------
 # App-specific and parsing dependencies (main environment)
 # ----------------------------
-RUN pip install --no-cache-dir --prefer-binary \
+RUN uv pip install \
     instructor \
     openai \
     "pydantic>=2.6,<3" \
@@ -93,8 +97,8 @@ RUN pip install --no-cache-dir --prefer-binary \
 # Optional: OCR / ML accelerators (main environment)
 # ----------------------------
 # Try GPU runtime first; fallback to CPU if unavailable
-RUN pip install --no-cache-dir --prefer-binary "onnxruntime-gpu>=1.23.0" || echo "GPU runtime skipped"
-RUN pip install --no-cache-dir --prefer-binary "onnxruntime>=1.17,<2"
+RUN uv pip install "onnxruntime-gpu>=1.23.0" || echo "GPU runtime skipped"
+RUN uv pip install "onnxruntime>=1.17,<2"
 
 # ----------------------------
 # CREATE SEPARATE DOCLING VIRTUAL ENVIRONMENT
@@ -102,95 +106,34 @@ RUN pip install --no-cache-dir --prefer-binary "onnxruntime>=1.17,<2"
 # This isolates docling dependencies to prevent conflicts
 USER root
 RUN mkdir -p /opt/venv_docling && \
-    chown -R airflow:airflow /opt/venv_docling
+    python -m venv /opt/venv_docling && \
+    chown -R airflow /opt/venv_docling
 
 USER airflow
 
-# Create virtual environment for docling
-RUN python -m venv /opt/venv_docling
-
 # Install docling + its dependencies in isolated venv
-# Use the specific constraints from requirements-docling.txt
 RUN /opt/venv_docling/bin/pip install --upgrade pip setuptools wheel && \
-    /opt/venv_docling/bin/pip install --no-cache-dir --prefer-binary \
-    "docling==2.57.0" \
-    "docling-core>=2.8.0" \
-    "docling-parse>=2.4.0" \
-    "pillow>=10.0.0" \
-    "pdf2image>=1.16.0" \
-    "rapidocr-onnxruntime>=1.3.0" \
-    "easyocr>=1.6.0" \
-    "opencv-python>=4.8.0" \
-    "numpy>=1.24.0" \
-    "pydantic>=2.0.0" \
-    "torch>=2.0.0" \
-    "torchvision>=0.15.0"
+    /opt/venv_docling/bin/pip install "docling==2.58.0"
 
 # Create wrapper scripts for docling execution
-RUN mkdir -p /opt/scripts && chown airflow:airflow /opt/scripts
-
 USER root
 
+RUN mkdir -p /opt/scripts && chown airflow /opt/scripts
+
 # Create script to run docling with isolated venv
-RUN cat > /opt/scripts/run_docling.sh << 'EOF'
-#!/bin/bash
-# Wrapper to run docling using isolated venv
-set -e
+RUN echo '#!/bin/bash' > /opt/scripts/run_docling.sh && \
+    echo 'set -e' >> /opt/scripts/run_docling.sh && \
+    echo 'source /opt/venv_docling/bin/activate' >> /opt/scripts/run_docling.sh && \
+    echo 'exec python "$@"' >> /opt/scripts/run_docling.sh && \
+    chmod +x /opt/scripts/run_docling.sh
 
-# Activate docling venv
-source /opt/venv_docling/bin/activate
-
-# Run the docling extractor script
-exec python "$@"
-EOF
-
-chmod +x /opt/scripts/run_docling.sh
-
-# Create script for running Airflow tasks with docling
-RUN cat > /opt/scripts/run_parsing_dag.sh << 'EOF'
-#!/bin/bash
-# Run parsing DAG with docling venv available
-source /opt/venv_docling/bin/activate
-export PYTHONPATH="/opt/airflow/workspace:$PYTHONPATH"
-export PATH="/opt/venv_docling/bin:$PATH"
-exec python "$@"
-EOF
-
-chmod +x /opt/scripts/run_parsing_dag.sh
-
-# Create script for subprocess calls from Airflow
-RUN cat > /opt/scripts/docling_parser.py << 'EOF'
-#!/usr/bin/env python
-"""
-Wrapper to run docling_extractor_v2.py using subprocess
-Used by parsing_dag.py to invoke docling in isolated environment
-"""
-import sys
-import subprocess
-import os
-
-def run_docling_extractor(script_rel, ticker_folder, pdf_file):
-    """Run docling extractor in isolated venv"""
-    # Activate the docling venv and run the script
-    cmd = [
-        '/opt/venv_docling/bin/python',
-        script_rel,
-        ticker_folder,
-        '--pdf',
-        pdf_file,
-    ]
-    
-    env = os.environ.copy()
-    env['PYTHONPATH'] = '/opt/airflow/workspace'
-    
-    result = subprocess.run(cmd, env=env, cwd='/opt/airflow/workspace')
-    sys.exit(result.returncode)
-
-if __name__ == '__main__':
-    run_docling_extractor(sys.argv[1], sys.argv[2], sys.argv[3])
-EOF
-
-chmod +x /opt/scripts/docling_parser.py
+# Create wrapper script for Airflow subprocess calls
+RUN echo '#!/bin/bash' > /opt/scripts/run_parsing_with_docling.sh && \
+    echo 'source /opt/venv_docling/bin/activate' >> /opt/scripts/run_parsing_with_docling.sh && \
+    echo 'export PYTHONPATH="/opt/airflow/workspace:$PYTHONPATH"' >> /opt/scripts/run_parsing_with_docling.sh && \
+    echo 'export PATH="/opt/venv_docling/bin:$PATH"' >> /opt/scripts/run_parsing_with_docling.sh && \
+    echo 'exec python "$@"' >> /opt/scripts/run_parsing_with_docling.sh && \
+    chmod +x /opt/scripts/run_parsing_with_docling.sh
 
 USER airflow
 
@@ -205,4 +148,18 @@ ENV PATH="/opt/scripts:$PATH"
 
 # Copy all workspace files (DAGs, src/, data/, etc.)
 COPY . /opt/airflow/workspace
+
+# Create initialization script that runs before services start
+RUN mkdir -p /opt/airflow/scripts && \
+    echo '#!/bin/bash' > /opt/airflow/scripts/init_services.sh && \
+    echo 'set -e' >> /opt/airflow/scripts/init_services.sh && \
+    echo 'echo "Initializing PostgreSQL database..."' >> /opt/airflow/scripts/init_services.sh && \
+    echo 'python /opt/airflow/workspace/setup/init_database.py' >> /opt/airflow/scripts/init_services.sh && \
+    echo 'echo "✓ Database initialization complete"' >> /opt/airflow/scripts/init_services.sh && \
+    chmod +x /opt/airflow/scripts/init_services.sh
+
+USER root
+RUN chown airflow /opt/airflow/scripts/init_services.sh
+
+USER airflow
 

@@ -108,10 +108,16 @@ x-airflow-common:
 services:
   postgres:
     image: postgres:13
+    ports:
+      - "5432:5432"
     environment:
       POSTGRES_USER: airflow
       POSTGRES_PASSWORD: airflow
       POSTGRES_DB: airflow
+    networks:
+      - default
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - postgres-db-volume:/var/lib/postgresql/data
     healthcheck:
@@ -119,7 +125,7 @@ services:
       interval: 10s
       retries: 5
       start_period: 5s
-    restart: always
+    restart: on-failure
 
   redis:
     image: redis:latest
@@ -131,7 +137,7 @@ services:
       timeout: 30s
       retries: 50
       start_period: 30s
-    restart: always
+    restart: on-failure
 
   airflow-webserver:
     <<: *airflow-common
@@ -144,7 +150,7 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
-    restart: always
+    restart: on-failure
     depends_on:
       <<: *airflow-common-depends-on
       airflow-init:
@@ -159,7 +165,7 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
-    restart: always
+    restart: on-failure
     depends_on:
       <<: *airflow-common-depends-on
       airflow-init:
@@ -182,7 +188,7 @@ services:
       # Required to handle warm shutdown of the celery workers properly
       # See https://airflow.apache.org/docs/docker-stack/entrypoint.html#signal-propagation
       DUMB_INIT_SETSID: "0"
-    restart: always
+    restart: on-failure
     depends_on:
       <<: *airflow-common-depends-on
       airflow-init:
@@ -197,7 +203,7 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
-    restart: always
+    restart: on-failure
     depends_on:
       <<: *airflow-common-depends-on
       airflow-init:
@@ -211,6 +217,7 @@ services:
       - -c
       - |
         set -e
+        echo "1. Checking Airflow version..."
         function ver() { printf "%04d%04d%04d%04d" $${1//./ } ; }
         airflow_version=$$(AIRFLOW__LOGGING__LOGGING_LEVEL=INFO airflow version)
         airflow_version_comparable=$$(ver $${airflow_version})
@@ -220,12 +227,21 @@ services:
           echo -e "\033[1;31mERROR!!!: Too old Airflow version $${airflow_version}\e[0m"
           exit 1
         fi
+        echo "✓ Airflow version OK"
+        
+        echo "2. Creating Airflow directories..."
         mkdir -p /sources/data/airflow/{logs,plugins,config} /sources/src/dags \
                 /sources/data/huggingface_cache /sources/data/deepsearch_models
         chown -R "$${AIRFLOW_UID:-50000}:0" /sources/data/airflow/{logs,plugins,config}
         chown -R "$${AIRFLOW_UID:-50000}:0" /sources/src/dags
         chown -R "$${AIRFLOW_UID:-50000}:0" /sources/data/huggingface_cache
         chown -R "$${AIRFLOW_UID:-50000}:0" /sources/data/deepsearch_models
+        echo "✓ Directories created"
+        
+        echo "3. Initializing PostgreSQL database (concept_db)..."
+        cd /sources && python setup/init_database.py || echo "⚠️ Database initialization had issues, continuing..."
+        
+        echo "4. Running Airflow version check..."
         exec /entrypoint airflow version
     environment:
       <<: *airflow-common-env
@@ -234,6 +250,12 @@ services:
       _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-airflow}
       _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:-airflow}
       _PIP_ADDITIONAL_REQUIREMENTS: ""
+      # Database initialization environment variables
+      DB_HOST: "postgres"
+      DB_PORT: "5432"
+      DB_NAME: "concept_db"
+      DB_USER: "airflow"
+      DB_PASSWORD: "airflow"
     volumes:
       - ${AIRFLOW_PROJ_DIR:-.}:/sources
 
@@ -266,7 +288,57 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
-    restart: always
+    restart: on-failure
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  # FastAPI Backend Server
+  fastapi:
+    <<: *airflow-common
+    command: bash -c "cd /opt/airflow/workspace && python -m uvicorn src.backends.enhanced_fastapi_server:app --host 0.0.0.0 --port 8000"
+    ports:
+      - "8000:8000"
+    environment:
+      <<: *airflow-common-env
+      DB_HOST: "postgres"
+      DB_PORT: "5432"
+      DB_NAME: "concept_db"
+      DB_USER: "airflow"
+      DB_PASSWORD: "airflow"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: on-failure
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  # Streamlit Frontend Server
+  streamlit:
+    <<: *airflow-common
+    command: bash -c "cd /opt/airflow/workspace && streamlit run src/frontend/rag_streamlit_frontend.py --server.port=8501 --server.address=0.0.0.0"
+    ports:
+      - "8501:8501"
+    environment:
+      <<: *airflow-common-env
+      STREAMLIT_SERVER_HEADLESS: "true"
+      STREAMLIT_SERVER_PORT: "8501"
+      STREAMLIT_SERVER_ADDRESS: "0.0.0.0"
+      FASTAPI_HOST: "fastapi"
+      FASTAPI_PORT: "8000"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: on-failure
     depends_on:
       <<: *airflow-common-depends-on
       airflow-init:
