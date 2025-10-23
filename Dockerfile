@@ -47,7 +47,7 @@ ENV PATH="/root/.cargo/bin:$PATH"
 # ----------------------------
 ARG AIRFLOW_VERSION=2.10.4
 ARG PYTHON_VERSION=3.11
-ARG CONSTRAINTS_URL="https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION}.txt"
+ARG CONSTRAINTS_URL="https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-3.11.txt"
 
 RUN python -m pip install --upgrade pip setuptools wheel \
  && uv pip install -c ${CONSTRAINTS_URL} \
