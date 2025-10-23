@@ -43,7 +43,7 @@ ENV PATH="/root/.cargo/bin:$PATH"
 # ----------------------------
 ARG AIRFLOW_VERSION=2.10.4
 ARG PYTHON_VERSION=3.11
-ARG CONSTRAINTS_URL="https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION}.txt"
+ARG CONSTRAINTS_URL="https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-3.11.txt"
 
 RUN python -m pip install --upgrade pip setuptools wheel \
  && uv pip install -c ${CONSTRAINTS_URL} \
@@ -83,8 +83,10 @@ RUN uv pip install \
     "uvicorn[standard]>=0.27,<1" \
     "streamlit>=1.39.0" \
     "transformers>=4.34,<5" \
+    langchain \
     wikipedia \
     langchain-openai \
+    langchain-text-splitters \
     pinecone \
     psycopg2-binary \
     langsmith

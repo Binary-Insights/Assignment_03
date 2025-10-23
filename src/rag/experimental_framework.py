@@ -1,25 +1,3 @@
-"""
-experimental_framework.py
--------------------------------------
-Processes ALL split parts for any ticker dynamically and produces:
-- Old-format chunk JSONs
-- Old-style detailed summary.json (with counts, mins/max, stddev, timing)
-
-Usage:
-    python experimental_framework.py FINTBX
-
-Reads parsed text from:
-    data/parsed/{TICKER}/{ticker_lower}_part_***/text/structured_content.txt
-    (falls back to full_document.txt if structured_content.txt is missing)
-
-Writes:
-    data/rag_experiments/chunks_recursive.json
-    data/rag_experiments/chunks_hybrid.json
-    data/rag_experiments/chunks_markdownheader.json
-    data/rag_experiments/chunks_codeaware.json
-    data/rag_experiments/summary.json   <-- restored old detailed style
-"""
-
 import os
 import sys
 import json
@@ -30,10 +8,11 @@ from statistics import mean, pstdev  # population std dev (old summary looked li
 from typing import Dict, List, Tuple, Any
 
 from tqdm import tqdm
-from langchain.text_splitter import (
+from langchain_text_splitters import (
     RecursiveCharacterTextSplitter,
     MarkdownHeaderTextSplitter,
 )
+
 
 # -------------------------------
 #  Token counting (with fallback)
