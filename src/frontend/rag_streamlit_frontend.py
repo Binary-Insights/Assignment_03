@@ -150,6 +150,11 @@ with st.sidebar:
     st.subheader("🔧 Model Settings")
     use_vector_db = st.checkbox("Use Vector DB Search", value=True, help="Search Pinecone vector database first")
     use_wikipedia = st.checkbox("Allow Wikipedia Fallback", value=True, help="Search Wikipedia if not found in vector DB")
+    restrict_to_finance = st.checkbox(
+        "Restrict queries to finance/economics/mathematics topics only",
+        value=True,
+        help="If checked, only finance/economics/mathematics queries are allowed. The LLM will evaluate relevance and block irrelevant queries. If unchecked, all queries are allowed."
+    )
     
     st.subheader("📊 Vector DB Results")
     num_vector_results = st.slider(
@@ -234,12 +239,50 @@ with col2:
 # Submit button
 submit_btn = st.button("🚀 Get Answer", type="primary", use_container_width=True)
 
+
 # Process query
 if submit_btn and query.strip():
     try:
         with st.spinner("🔄 Processing your question..."):
             
-            # Prepare request
+            # Step 1: Check relevance if restriction is enabled
+            if restrict_to_finance:
+                st.status("🔍 Checking query relevance...", state="running")
+                
+                # Call backend to check relevance with LLM
+                relevance_payload = {
+                    "query": query
+                }
+                
+                try:
+                    relevance_response = requests.post(
+                        f"{st.session_state.api_url}/check-relevance",
+                        json=relevance_payload,
+                        timeout=15
+                    )
+                    
+                    if relevance_response.status_code == 200:
+                        relevance_result = relevance_response.json()
+                        is_relevant = relevance_result.get("is_relevant", False)
+                        relevance_reason = relevance_result.get("reason", "")
+                        
+                        st.status("✓ Relevance check complete", state="complete")
+                        
+                        if not is_relevant:
+                            st.error(f"❌ Query Rejected: {relevance_reason}")
+                            st.info("💡 Please ask a question related to finance, economics, or mathematics (preferably related to finance/economics).")
+                            st.stop()
+                        else:
+                            st.success(f"✓ Query accepted: {relevance_reason}")
+                    else:
+                        st.warning("⚠️ Could not check relevance with backend. Proceeding anyway...")
+                
+                except requests.exceptions.Timeout:
+                    st.warning("⚠️ Relevance check timed out. Proceeding anyway...")
+                except Exception as e:
+                    st.warning(f"⚠️ Error checking relevance: {e}. Proceeding anyway...")
+            
+            # Step 2: Process the query (if it passed relevance check or restriction is disabled)
             st.status("📤 Sending request to FastAPI server...", state="running")
             request_payload = {
                 "query": query,
@@ -408,7 +451,6 @@ if submit_btn and query.strip():
                 confidence = structured_note['confidence_score']
                 st.markdown(f"**Confidence Score:** {confidence:.1%}")
                 st.progress(confidence)
-
     
     except requests.exceptions.ConnectionError:
         st.error(f"❌ Cannot connect to FastAPI server at {st.session_state.api_url}")
