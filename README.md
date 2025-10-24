@@ -137,12 +137,6 @@ data/
 | **Docling parse error** | Ensure Python dependencies match Docling 2.57 requirements. |
 | **“Dag references non-existent pools”** | Create pool in Airflow UI → Admin → Pools or remove the pool reference. |
 
----
-
-## Support
-See the `docs/` folder for detailed setup guides and codelabs.
-
----
 
 ## Codelabs – Documentation
 Access interactive documentation and tutorials for Project AURELIA:
