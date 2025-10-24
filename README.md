@@ -1,8 +1,6 @@
 # 🧠 Project AURELIA: Financial Concept Extraction Pipeline  
 **DAMG 7245 – Fall 2025 – Binary Insights**
 
-# 🧠 Project AURELIA: Financial Concept Extraction Pipeline
-
 ## Overview
 Automates the parsing, chunking, embedding, retrieval, and structured-note generation of financial concepts from the *Financial Toolbox User’s Guide (fintbx.pdf)*.  
 Powered by **Apache Airflow**, **OpenAI GPT-4o**, **Docling**, **LangChain**, **Pinecone**, and **AWS S3**, all containerized and orchestrated on **AWS EC2 (Docker Host)** (Assignment 3 – Project AURELIA, n.d.).
@@ -150,3 +148,4 @@ Access interactive documentation and tutorials for Project AURELIA:
 WE ATTEST THAT WE HAVEN’T USED ANY OTHER STUDENTS’ WORK IN OUR ASSIGNMENT AND ABIDE BY THE POLICIES LISTED IN THE STUDENT HANDBOOK.
 
 ---
+
