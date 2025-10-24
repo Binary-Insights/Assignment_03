@@ -10,6 +10,8 @@ docs/*.md
 
 .venv*
 
+!data/raw/FINTBX/pdf/
+
 *.pem
 
 # Byte-compiled / optimized / DLL files
