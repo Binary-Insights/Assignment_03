@@ -7,7 +7,7 @@ on:
 
 jobs:
   deploy:
-    if: github.head_ref == 'reky'
+    if: github.head_ref == 'reky-01'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code

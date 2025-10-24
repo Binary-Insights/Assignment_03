@@ -151,6 +151,11 @@ nohup sudo -u postgres /usr/lib/postgresql/16/bin/postgres -D /var/lib/postgresq
 sleep 2
 ps aux | grep postgres | grep -v grep
 
+# -------------------------------
+
+docker compose down
+docker system prune -a --volumes -f
+docker volume prune -f
 
 ---------------------------
 This will:
