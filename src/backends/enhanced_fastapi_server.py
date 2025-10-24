@@ -49,6 +49,18 @@ pipeline = None
 
 # ==================== Pydantic Models ====================
 
+class RelevanceCheckRequest(BaseModel):
+    """Request model for query relevance check"""
+    query: str
+
+
+class RelevanceCheckResponse(BaseModel):
+    """Response model for query relevance check"""
+    is_relevant: bool
+    reason: str
+    confidence: float
+
+
 class EnhancedQueryRequest(BaseModel):
     """Request model for enhanced RAG query"""
     query: str
@@ -130,11 +142,114 @@ async def root():
         },
         "endpoints": {
             "health": "/health (GET)",
+            "check_relevance": "/check-relevance (POST) - Check query relevance to finance/economics",
             "query": "/query (POST) - Enhanced query with fallback",
             "concepts": "/concepts (GET) - Get cached concepts",
             "docs": "/docs (GET) - Interactive API documentation"
         }
     }
+
+
+@app.post("/check-relevance", response_model=RelevanceCheckResponse)
+async def check_relevance(request: RelevanceCheckRequest):
+    """
+    Check if a query is relevant to finance/economics/mathematics
+    Uses LLM to make intelligent relevance determination
+    
+    Args:
+        request: RelevanceCheckRequest with query text
+    
+    Returns:
+        RelevanceCheckResponse with relevance decision and explanation
+    """
+    global pipeline
+    
+    if not pipeline:
+        raise HTTPException(status_code=503, detail="Pipeline not initialized")
+    
+    try:
+        logger.info(f"Checking relevance for query: {request.query[:50]}...")
+        
+        if not request.query.strip():
+            raise HTTPException(status_code=400, detail="Query cannot be empty")
+        
+        # Use LLM to determine relevance
+        from langchain_core.messages import HumanMessage
+        
+        relevance_prompt = f"""Evaluate if the following query is relevant to finance, economics, or mathematics (preferably related to finance/economics).
+
+Query: "{request.query}"
+
+Respond in JSON format ONLY with no additional text:
+{{
+    "is_relevant": true/false,
+    "reason": "brief explanation of why it is/isn't relevant",
+    "confidence": 0.0 to 1.0 (how confident you are in this assessment),
+    "topics": ["list", "of", "detected", "topics"]
+}}
+
+Relevant domains include:
+- Finance: investments, portfolios, trading, derivatives, bonds, stocks, etc.
+- Economics: economic analysis, markets, monetary/fiscal policy, supply/demand, etc.
+- Mathematics for finance: statistics, probability, optimization, time series analysis, etc.
+- MATLAB in finance: using MATLAB for financial analysis or computations
+- Related: quantitative analysis, risk management, asset management, etc.
+
+Irrelevant examples would be: cooking recipes, sports, history, entertainment, health (unless finance-related), etc.
+Be fair but strict - the query should have a clear connection to at least one of the relevant domains."""
+        
+        response = pipeline.llm.invoke([HumanMessage(content=relevance_prompt)])
+        response_text = response.content.strip()
+        
+        logger.info(f"LLM Relevance Response: {response_text[:200]}...")
+        
+        # Parse JSON response
+        import json
+        try:
+            # Find JSON in response (in case LLM adds extra text)
+            start_idx = response_text.find('{')
+            end_idx = response_text.rfind('}') + 1
+            
+            if start_idx == -1 or end_idx == 0:
+                # Fallback: LLM didn't return valid JSON, use a safe default
+                logger.warning("LLM response was not valid JSON, using fallback")
+                return RelevanceCheckResponse(
+                    is_relevant=False,
+                    reason="Could not parse relevance check. Please try a clearer query.",
+                    confidence=0.5
+                )
+            
+            json_str = response_text[start_idx:end_idx]
+            result = json.loads(json_str)
+            
+            is_relevant = result.get("is_relevant", False)
+            reason = result.get("reason", "Could not determine relevance")
+            confidence = result.get("confidence", 0.5)
+            
+            if is_relevant:
+                logger.info(f"✓ Query is relevant: {reason}")
+            else:
+                logger.info(f"✗ Query is NOT relevant: {reason}")
+            
+            return RelevanceCheckResponse(
+                is_relevant=is_relevant,
+                reason=reason,
+                confidence=float(confidence)
+            )
+        
+        except json.JSONDecodeError as e:
+            logger.error(f"Error parsing LLM JSON response: {e}")
+            return RelevanceCheckResponse(
+                is_relevant=False,
+                reason="Could not evaluate query relevance. Please try again.",
+                confidence=0.0
+            )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error checking relevance: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
 
 @app.post("/query", response_model=EnhancedQueryResponse)
