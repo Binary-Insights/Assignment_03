@@ -5,6 +5,8 @@ config
 logs
 plugins
 
+docs/*.md
+*.pem
 
 .venv*
 
