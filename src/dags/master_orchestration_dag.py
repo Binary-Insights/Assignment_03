@@ -62,9 +62,20 @@ trigger_storing = TriggerDagRunOperator(
 )
 
 # ============================================================================
+# Task 4: Wait for storing_dag to complete, then trigger rag_ingestion_dag
+# ============================================================================
+trigger_rag_ingestion = TriggerDagRunOperator(
+    task_id='trigger_rag_ingestion_dag',
+    trigger_dag_id='rag_ingestion_dag',
+    dag=dag,
+    wait_for_completion=True,  # Wait for the triggered DAG to complete
+    poke_interval=30,  # Check status every 30 seconds
+)
+
+# ============================================================================
 # Set task dependencies (sequential execution)
 # ============================================================================
-trigger_split_pdfs >> trigger_parsing >> trigger_storing
+trigger_split_pdfs >> trigger_parsing >> trigger_storing >> trigger_rag_ingestion
 
 # ============================================================================
 # Task summary logging
@@ -81,6 +92,7 @@ if __name__ == "__main__":
     ║          Output: data/raw/* (split PDFs)                       ║
     ║                                                                ║
     ║  2️⃣  trigger_parsing_dag                                       ║ 
+    ║      └─→ Parses split PDFs                                     ║
     ║          Input: data/raw/*                                     ║
     ║          Output: data/parsed/*                                 ║
     ║                                                                ║
@@ -88,6 +100,11 @@ if __name__ == "__main__":
     ║      └─→ Uploads parsed files to S3                            ║
     ║          Input: data/parsed/*                                  ║
     ║          S3: s3://bucket/assignment_03/parsed/*                ║
+    ║                                                                ║
+    ║  4️⃣  trigger_rag_ingestion_dag                                ║
+    ║      └─→ Runs experimental_framework + Pinecone ingestion      ║
+    ║          Input: S3 parsed documents                            ║
+    ║          Output: Pinecone vector index                         ║
     ║                                                                ║
     ║  Status: Each task waits for previous to complete              ║ 
     ║  Trigger: Manual (no schedule)                                 ║
