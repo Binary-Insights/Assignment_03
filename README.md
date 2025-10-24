@@ -102,20 +102,6 @@ Run the complete workflow directly from **Airflow UI** by triggering the DAGs:
 5. **Upsert Vectors to Pinecone** → `upsert_task`  
 6. **Query via Streamlit/FastAPI`**
 
----
-
-## Results Summary
-| Metric | Result |
-|:--|:--|
-| Pages Parsed | > 5 000 |
-| Embeddings Generated | > 15 000 |
-| Average Cached Response | 1.2 s |
-| Average New Response | 3.4 s |
-| Accuracy & Completeness | > 90 % |
-| Citation Fidelity | 100 % |
-| S3 Bucket | `damg-binaryinsights-assignment-03` (prefix: `/artifacts/`) |
-
----
 
 ![Architecture Diagram](setup/architecture_diagram.png)
 
