@@ -28,7 +28,10 @@ logs/
 dags/__pycache__/
 
 # --- Raw and parsed data (handled via volume mounts or S3) ---
+# Exclude all of data/raw/ first
 data/raw/
+# Then include the specific PDF file we need
+!data/raw/pdf/fintbx.pdf
 data/parsed/
 data/artifacts/
 data/output/

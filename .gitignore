@@ -11,6 +11,8 @@ docs/*.md
 !concept_note_quality_report.md
 .venv*
 
+!data/raw/FINTBX/pdf/
+
 *.pem
 
 # Byte-compiled / optimized / DLL files

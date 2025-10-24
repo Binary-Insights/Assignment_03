@@ -30,7 +30,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && rm -rf /var/lib/apt/lists/*
 
 # Install uv (fast Python package manager)
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # ----------------------------
 # Switch back to airflow user
@@ -95,8 +96,7 @@ RUN uv pip install \
 # Optional: OCR / ML accelerators (main environment)
 # ----------------------------
 # Try GPU runtime first; fallback to CPU if unavailable
-RUN uv pip install "onnxruntime-gpu>=1.23.0" || echo "GPU runtime skipped"
-RUN uv pip install "onnxruntime>=1.17,<2"
+RUN uv pip install "onnxruntime-gpu>=1.23.0" 2>/dev/null || uv pip install "onnxruntime>=1.17,<2"
 
 # ----------------------------
 # CREATE SEPARATE DOCLING VIRTUAL ENVIRONMENT
