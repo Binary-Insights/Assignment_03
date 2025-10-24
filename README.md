@@ -9,9 +9,6 @@ Powered by **Apache Airflow**, **OpenAI GPT-4o**, **Docling**, **LangChain**, **
 
 ---
 
-## Architecture Diagram
-![Project AURELIA Architecture](4eb5d434-6562-4275-a8fc-07607be7bf05.png)
-
 ---
 
 ## Setup Instructions
