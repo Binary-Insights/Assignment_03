@@ -55,6 +55,8 @@ x-airflow-common:
     context: .
     dockerfile: Dockerfile
   image: assignment03:latest
+  env_file:
+    - .env
   environment:
     &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: CeleryExecutor
@@ -72,6 +74,9 @@ x-airflow-common:
     # See https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/logging-monitoring/check-health.html#scheduler-health-check-server
     # yamllint enable rule:line-length
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
+
+    DB_HOST: postgres
+    DB_PORT: 5432
     # WARNING: Use _PIP_ADDITIONAL_REQUIREMENTS option ONLY for a quick checks
     # for other purpose (development, test and especially production usage) build/extend Airflow image.
     # _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
@@ -80,16 +85,11 @@ x-airflow-common:
     TRANSFORMERS_CACHE: /home/airflow/.cache/huggingface/transformers
     # DeepSearch GLM model cache
     DEEPSEARCH_GLM_CACHE_DIR: /home/airflow/.cache/deepsearch_glm
-    # AWS Configuration for S3 integration
-    AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-    AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-    AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION}
-    S3_BUCKET_NAME: ${S3_BUCKET_NAME}
   volumes:
     - ${AIRFLOW_PROJ_DIR:-.}/src/dags:/opt/airflow/dags
     - ${AIRFLOW_PROJ_DIR:-.}/src/parse:/opt/airflow/src/parse
+    - ${AIRFLOW_PROJ_DIR:-.}/src/rag:/opt/airflow/src/rag
     - ${AIRFLOW_PROJ_DIR:-.}/data:/opt/airflow/data
-    - ${AIRFLOW_PROJ_DIR:-.}/data/logs:/opt/airflow/data/logs
     - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
     - ${AIRFLOW_PROJ_DIR:-.}/data/airflow/logs:/opt/airflow/logs
     # - ${AIRFLOW_PROJ_DIR:-.}/data/airflow/config:/opt/airflow/config

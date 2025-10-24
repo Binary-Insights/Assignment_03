@@ -2,19 +2,15 @@
 #   Dockerfile for Airflow + Docling OCR Parser
 #   Multi-environment setup for dependency isolation
 # ===============================================
-# Base image: Airflow 2.10.4 with Python 3.11
 FROM apache/airflow:2.10.4-python3.11
 
-# ----------------------------
-# System and environment setup
-# ----------------------------
 USER root
 ENV DEBIAN_FRONTEND=noninteractive \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_DEFAULT_TIMEOUT=100 \
     PYTHONPATH="/opt/airflow/workspace"
 
-# Install system dependencies for PDF parsing, OCR, and OpenGL rendering
+# ---- System dependencies for Docling, OCR, and visualization ----
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     git \
@@ -87,8 +83,10 @@ RUN uv pip install \
     "uvicorn[standard]>=0.27,<1" \
     "streamlit>=1.39.0" \
     "transformers>=4.34,<5" \
+    langchain \
     wikipedia \
     langchain-openai \
+    langchain-text-splitters \
     pinecone \
     psycopg2-binary \
     langsmith

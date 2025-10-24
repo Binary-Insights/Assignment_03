@@ -50,6 +50,7 @@ python src/rag/experimental_framework.py
 # Gives a summary of pinecone integration
 python src/rag/pinecone_integration.py
 
+python src/rag/experimental_framework.py
 
 # Ingestion into Pinecone - inserts vectors into 
 python src/rag/ingest_to_pinecone.py
@@ -104,10 +105,6 @@ docker inspect assignment_03-postgres-1 | findstr "IPAddress"
 
 
 
-# ----------------- To open shell inside the Docker container 
-
-docker exec -it <container_id> /bin/bash
-
 
 # -------------------------------- Setup EC2 -----------------------------------------------
 
@@ -149,52 +146,16 @@ docker-compose up -d
 
 Summary:
 ----------------------------------------------- Prompt Text -------------------------------------
+"""
+Based on the following content about "{concept_term}", extract and structure the key financial information,
+Provide comprehensive, accurate financial information. 
 
-The PostgreSQL process from the first terminal isn't accessible from this terminal. 
-Let's start PostgreSQL as a proper background daemon that persists. 
-Run this in the terminal where you want to keep PostgreSQL running:
+Content:
+{content}
 
-nohup sudo -u postgres /usr/lib/postgresql/16/bin/postgres -D /var/lib/postgresql/16/main > /tmp/postgres.log 2>&1 &
-sleep 2
-ps aux | grep postgres | grep -v grep
-
-
----------------------------
-This will:
-
-Start PostgreSQL in the background
-Keep it running even if you close the terminal
-Show you the processes running
-Then in a new terminal, run:
-
-# Create airflow user
-sudo -u postgres psql -c "CREATE USER airflow WITH CREATEDB;"
-
-# Create database
-sudo -u postgres createdb -O airflow concept_db
-
-# Test connection
-psql -U airflow -d concept_db -c "SELECT 1;"
-
-# Check status
-bash ~/OneDrive/Documents/NortheasternAssignments/09_BigDataIntelAnlytics/Assignments/Assignment_03/check_postgres_quick.sh
-
-sudo -u postgres psql -d concept_db -c "GRANT ALL PRIVILEGES ON SCHEMA public TO airflow;"
-
-sudo -u postgres psql -d concept_db << 'EOF'
-GRANT ALL PRIVILEGES ON SCHEMA public TO airflow;
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO airflow;
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO airflow;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO airflow;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO airflow;
-EOF
-
-wsl -- bash -c 'sudo -u postgres psql -d concept_db -c "GRANT ALL PRIVILEGES ON SCHEMA public TO airflow; GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO airflow; GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO airflow; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO airflow; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO airflow;"'
+Please create a detailed financial concept note with all required fields.
+Ensure the confidence_score results the quality and completeness of extracted information.
+"""
 
 
-/var/lib/postgresql/16/main/pg_hba.conf
-
-
-
-# To store in S3 bucket using hooks
-python src/store/s3.py --local_folder data/parsed/FINTBX --bucket damg-binaryinsights-assignment-03 --prefix assignment_03/parsed
+https://app.eraser.io/workspace/v5ayKgugzVeSTd6ChHKM
