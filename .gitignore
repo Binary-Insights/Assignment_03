@@ -8,6 +8,7 @@ plugins
 docs/*.md
 *.pem
 
+!concept_note_quality_report.md
 .venv*
 
 !data/raw/FINTBX/pdf/
