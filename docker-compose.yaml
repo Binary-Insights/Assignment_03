@@ -55,6 +55,8 @@ x-airflow-common:
     context: .
     dockerfile: Dockerfile
   image: assignment03:latest
+  env_file:
+    - .env
   environment:
     &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: CeleryExecutor
