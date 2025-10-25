@@ -93,18 +93,27 @@ class ConceptInfo(BaseModel):
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize pipeline on startup"""
+    """Initialize pipeline on startup (optional - allows server to run without it)"""
     global pipeline
     try:
         logger.info("=" * 70)
         logger.info("Enhanced FastAPI RAG Server Starting...")
         logger.info("=" * 70)
         
+        # Check if required credentials are available
+        openai_key = os.getenv("OPENAI_API_KEY")
+        if not openai_key:
+            logger.warning("⚠️ OPENAI_API_KEY not set - RAG pipeline will be unavailable")
+            logger.warning("⚠️ Set OPENAI_API_KEY environment variable to enable RAG features")
+            pipeline = None
+            return
+        
         pipeline = EnhancedRAGPipeline()
         logger.info("✓ Enhanced RAG pipeline initialized successfully")
     except Exception as e:
-        logger.error(f"Error during startup: {e}")
-        raise
+        logger.warning(f"⚠️ Warning during pipeline initialization: {e}")
+        logger.warning("⚠️ RAG pipeline unavailable - server will run in limited mode")
+        pipeline = None
 
 
 @app.on_event("shutdown")

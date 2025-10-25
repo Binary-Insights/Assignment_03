@@ -14,13 +14,31 @@ def upload_folder_to_s3(local_folder: str, bucket_name: str, s3_prefix: str, aws
     session = boto3.Session(profile_name=aws_profile) if aws_profile else boto3.Session()
     s3 = session.client('s3')
     local_folder = Path(local_folder)
+    
+    # Count total files first for progress tracking
+    total_files = sum(len(files) for _, _, files in os.walk(local_folder))
+    uploaded_count = 0
+    
+    print(f"Total files to upload: {total_files}")
+    
     for root, dirs, files in os.walk(local_folder):
         for file in files:
             local_path = Path(root) / file
             rel_path = local_path.relative_to(local_folder)
             s3_key = f"{s3_prefix}/{rel_path.as_posix()}"
-            print(f"Uploading {local_path} to s3://{bucket_name}/{s3_key}")
-            s3.upload_file(str(local_path), bucket_name, s3_key)
+            file_size_mb = local_path.stat().st_size / (1024 * 1024)
+            
+            uploaded_count += 1
+            print(f"[{uploaded_count}/{total_files}] Uploading {local_path} ({file_size_mb:.2f} MB) to s3://{bucket_name}/{s3_key}")
+            
+            # Use multipart upload for large files (>100MB)
+            if file_size_mb > 100:
+                config = boto3.s3.transfer.TransferConfig(multipart_threshold=100*1024*1024)
+                s3.upload_file(str(local_path), bucket_name, s3_key, Config=config)
+            else:
+                s3.upload_file(str(local_path), bucket_name, s3_key)
+            
+            print(f"✓ Uploaded {file_size_mb:.2f} MB")
 
 if __name__ == "__main__":
     import argparse
