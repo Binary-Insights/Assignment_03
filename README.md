@@ -136,7 +136,7 @@ data/
 Access interactive documentation and tutorials for Project AURELIA:
 
 [**Automating Financial Concept Extraction Pipeline**](https://codelabs-preview.appspot.com/?file_id=11KEFuXQkCkHAY6lqDIBsLace-moi5qR07OULxfLJguw#7)  
-[**Video Demo**]()
+[**Video Demo**](https://drive.google.com/file/d/1swWunkqs5XKwevfJgRsEdYzTySKmG8Kz/view?usp=sharing)
 
 ---
 
