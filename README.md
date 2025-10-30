@@ -55,7 +55,7 @@ LANGSMITH_API_KEY=your-langsmith-key
 
 ## 4. Install Python Dependencies
 ```bash
-pip install -r requirements.txt
+uv sync
 # Or, for Docling features:
 pip install -r requirements-docling.txt
 ```
@@ -208,6 +208,7 @@ Access interactive documentation and tutorials for Project AURELIA:
 WE ATTEST THAT WE HAVEN’T USED ANY OTHER STUDENTS’ WORK IN OUR ASSIGNMENT AND ABIDE BY THE POLICIES LISTED IN THE STUDENT HANDBOOK.
 
 ---
+
 
 
 
