@@ -91,7 +91,7 @@ streamlit run src/frontend/rag_streamlit_frontend.py
 
 ---
 
-## 9. (Optional) Docker Deployment
+## 9. Docker Deployment
 ```bash
 docker compose up --build
 ```
@@ -108,7 +108,7 @@ docker compose up --build
 
 ---
 
-## 11. (Optional) Deploy on AWS EC2
+## 11. Deploy on AWS EC2
 
 1. **Launch an EC2 Instance**
 	- Choose an instance type with ≥8GB RAM (e.g., t3.large).
@@ -208,6 +208,7 @@ Access interactive documentation and tutorials for Project AURELIA:
 WE ATTEST THAT WE HAVEN’T USED ANY OTHER STUDENTS’ WORK IN OUR ASSIGNMENT AND ABIDE BY THE POLICIES LISTED IN THE STUDENT HANDBOOK.
 
 ---
+
 
 
 
