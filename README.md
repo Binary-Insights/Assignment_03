@@ -93,11 +93,9 @@ streamlit run src/frontend/rag_streamlit_frontend.py
 
 ## 9. Docker Deployment
 ```bash
-docker compose up --build
+docker compose build –no cache
+docker compose up -d
 ```
-
----
-
 
 ---
 
@@ -142,7 +140,7 @@ docker compose up --build
 
 7. **(Optional) Start with Docker**
 	```bash
-	sudo docker compose up --build
+	sudo docker compose up -d
 	```
 
 8. **Run FastAPI Server**
@@ -208,6 +206,7 @@ Access interactive documentation and tutorials for Project AURELIA:
 WE ATTEST THAT WE HAVEN’T USED ANY OTHER STUDENTS’ WORK IN OUR ASSIGNMENT AND ABIDE BY THE POLICIES LISTED IN THE STUDENT HANDBOOK.
 
 ---
+
 
 
 
