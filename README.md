@@ -7,16 +7,29 @@ Powered by **Apache Airflow**, **OpenAI GPT-4o**, **Docling**, **LangChain**, **
 
 ## Setup Instructions
 
-### 1. Prerequisites
-- **RAM ≥ 8 GB**
-- **Docker Desktop** (Win/Mac) or Docker Engine + Compose (Linux)
-- **Git**
-- **AWS Account** (for S3 storage & IAM role)
-- **OpenAI API Key**
+The pipeline integrates:
+- **PDF Parsing & Chunking**
+- **Semantic Embedding (OpenAI)**
+- **Vector Search (Pinecone)**
+- **Wikipedia Fallback**
+- **Structured Note Generation (Instructor/OpenAI)**
+- **Caching (PostgreSQL)**
+- **Frontend (Streamlit)**
+- **Orchestration (Airflow)**
 
 ---
 
-### 2. Clone the Repository
+## 1. Prerequisites
+- Python 3.9+
+- PostgreSQL (local or cloud)
+- Pinecone account and index
+- OpenAI API key
+- All required Python packages (see `requirements.txt` or `requirements-docling.txt`)
+- `.env` file with all secrets and credentials
+
+---
+
+## 2. Clone the Repository
 ```bash
 git clone https://github.com/Binary-Insights/Assignment_03.git
 cd Assignment_03
@@ -24,77 +37,128 @@ cd Assignment_03
 
 ---
 
-### 3. Configure Environment
-Create a `.env` file in the project root:
-
+## 3. Configure Environment Variables
+Create a `.env` file in the project root. Example:
 ```env
-# AWS Configuration (for S3 integration)
-AWS_ACCESS_KEY_ID=your-aws-access-key-id-here
-AWS_SECRET_ACCESS_KEY=your-aws-secret-access-key-here
-AWS_DEFAULT_REGION=us-east-1
-S3_BUCKET_NAME=your-s3-bucket-name
-
-# OpenAI Configuration
-OPENAI_API_KEY=your-openai-api-key-here
-
-# LangSmith Configuration (for tracing)
-LANGSMITH_API_KEY=your-langsmith-api-key-here
-
-# Pinecone Configuration (Vector Database)
-PINECONE_API_KEY=your-pinecone-api-key-here
-PINECONE_ENVIRONMENT=us-east-1
-PINECONE_INDEX_NAME=bigdata-assignment-03
-PINECONE_EMBEDDING_DIMENSION=3072
-PINECONE_EMBEDDING_MODEL=text-embedding-3-large
-
-# Project Configuration
-PROJECT_NAME=Assignment_03
-LOG_LEVEL=INFO
-
-# PostgreSQL Configuration (Concept Caching)
-DB_HOST=172.24.98.166
+OPENAI_API_KEY=your-openai-key
+PINECONE_API_KEY=your-pinecone-key
+PINECONE_INDEX_NAME=your-pinecone-index
+DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=concept_db
 DB_USER=postgres
-DB_PASSWORD=your-postgres-password-here
+DB_PASSWORD=your-db-password
+LANGSMITH_API_KEY=your-langsmith-key
 ```
 
 ---
 
-### 4. Build and Start Airflow and Services
+## 4. Install Python Dependencies
 ```bash
-# Initialize Airflow database (first time only)
-docker compose up airflow-init
-
-# Start all containers
-docker compose up -d
+pip install -r requirements.txt
+# Or, for Docling features:
+pip install -r requirements-docling.txt
 ```
 
 ---
 
-### 5. Access Dashboards
-| Service | URL | Default Credentials |
-|:--|:--|:--|
-| Airflow UI | http://localhost:8080 | `airflow / airflow` |
-| Streamlit UI | http://localhost:8501 | — |
-| FastAPI Docs | http://localhost:8000/docs | — |
+## 5. Initialize the Database
+Ensure PostgreSQL is running and the database exists. The backend will auto-create tables on first run.
 
 ---
 
-## Run Instructions
+## 6. Start the FastAPI Server
+From the project root:
+```bash
+python run_fastapi.py
+```
+- Server runs at `http://localhost:8000`
+- API docs: `http://localhost:8000/docs`
 
-### 1. Full Pipeline (Recommended)
-Run the complete workflow directly from **Airflow UI** by triggering the DAGs:
-- `src/dags/fintbx_ingest_dag.py`
-- `src/dags/financial_terms_enrichment_dag.py`
+---
 
-### 2. Manual Step-by-Step
-1. **Split PDFs** → `split_pdf_task`  
-2. **Parse with Docling** → `docling_parse_task`  
-3. **Chunk Text** → `langchain_chunk_task`  
-4. **Generate Embeddings** → `embedding_task`  
-5. **Upsert Vectors to Pinecone** → `upsert_task`  
-6. **Query via Streamlit/FastAPI`**
+## 7. Test the API
+- Open `http://localhost:8000/docs` in your browser
+- Try endpoints like `/health`, `/query`, `/check-relevance`, `/concepts`
+
+---
+
+## 8. (Optional) Run the Streamlit Frontend
+```bash
+streamlit run src/frontend/rag_streamlit_frontend.py
+```
+- Set the API URL in the sidebar if needed.
+
+---
+
+## 9. (Optional) Docker Deployment
+```bash
+docker compose up --build
+```
+
+---
+
+
+---
+
+## 10. Troubleshooting
+- Check `.env` for missing/incorrect keys
+- Ensure PostgreSQL and Pinecone are accessible
+- Review logs for errors
+
+---
+
+## 11. (Optional) Deploy on AWS EC2
+
+1. **Launch an EC2 Instance**
+	- Choose an instance type with ≥8GB RAM (e.g., t3.large).
+	- Use Ubuntu or Amazon Linux for compatibility.
+	- Attach your SSH key pair for secure access.
+
+2. **Connect to EC2**
+	```bash
+	ssh -i /path/to/your-key.pem ubuntu@<EC2_PUBLIC_IP>
+	```
+
+3. **Install System Dependencies**
+	```bash
+	sudo apt update
+	sudo apt install python3-pip git docker.io docker-compose -y
+	```
+
+4. **Clone the Repository**
+	```bash
+	git clone https://github.com/Binary-Insights/Assignment_03.git
+	cd Assignment_03
+	```
+
+5. **Set Up Environment Variables**
+	- Create your `.env` file as described above.
+
+6. **Install Python Packages**
+	```bash
+	pip3 install -r requirements.txt
+	```
+
+7. **(Optional) Start with Docker**
+	```bash
+	sudo docker compose up --build
+	```
+
+8. **Run FastAPI Server**
+	```bash
+	python3 run_fastapi.py
+	```
+
+9. **Open Ports**
+	- Ensure security group allows inbound traffic on ports 8000 (FastAPI), 8501 (Streamlit), 8080 (Airflow), etc.
+
+10. **Access Services**
+	 - FastAPI: `http://<EC2_PUBLIC_IP>:8000`
+	 - Streamlit: `http://<EC2_PUBLIC_IP>:8501`
+	 - Airflow: `http://<EC2_PUBLIC_IP>:8080`
+
+---
 
 
 ![Architecture Diagram](setup/architecture_diagram.png)
@@ -144,5 +208,6 @@ Access interactive documentation and tutorials for Project AURELIA:
 WE ATTEST THAT WE HAVEN’T USED ANY OTHER STUDENTS’ WORK IN OUR ASSIGNMENT AND ABIDE BY THE POLICIES LISTED IN THE STUDENT HANDBOOK.
 
 ---
+
 
 
